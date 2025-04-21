@@ -30,17 +30,27 @@
               <li><a href="#sdk-installation">SDK Installation</a></li>
             </ul>
           </li>
-          <li><a href="#workflow-definition">Workflow Definition</a>
+          <li><a href="#workflow-definition">Workflow Development</a>
               <ul>
                   <li><a href="#workflow-definition">Overview</a></li>
+                  <li><a href="#workflow-registration">Registration</a></li>                  
                   <li><a href="#workflow-constraints">Constraints (Determinism)</a></li>
+                  <li><a href="#workflow-versioning">Versioning (Patching)</a></li>
+                  <li><a href="#child-workflows">Child Workflows</a></li>
+                  <li><a href="#continue-as-new">Continue-As-New</a></li>
+                  <li><a href="#side-effects">Side Effects</a></li>
+                  <li><a href="#local-activities">Local Activities</a></li>
+                  <li><a href="#mutations">Mutations</a></li>
               </ul>
           </li>
-          <li><a href="#activity-definition">Activity Definition</a>
+          <li><a href="#activity-definition">Activity Development</a>
               <ul>
                   <li><a href="#activity-definition">Overview</a></li>
                   <li><a href="#activity-context">Context & Info</a></li>
                   <li><a href="#activity-registration">Registration</a></li>
+                  <li><a href="#activity-heartbeating">Heartbeating</a></li>
+                  <li><a href="#activity-async-completion">Asynchronous Completion</a></li>
+                  <li><a href="#activity-cancellation">Cancellation</a></li>
               </ul>
           </li>
           <!-- TODO: Add Worker Process Nav -->
@@ -52,21 +62,14 @@
                   <li><a href="#get-workflow-result">Get Result</a></li>
                   <li><a href="#signal-workflows">Signal</a></li>
                   <li><a href="#query-workflows">Query</a></li>
+                  <li><a href="#update-workflows">Update</a></li>
                   <li><a href="#terminate-workflows">Terminate</a></li>
                   <li><a href="#cancel-workflows">Cancel</a></li>
               </ul>
           </li>
           <li><a href="#advanced-concepts">Advanced Concepts</a>
               <ul>
-                  <li><a href="#activity-heartbeating">Activity Heartbeating</a></li>
-                  <li><a href="#activity-async-completion">Asynchronous Completion</a></li>
-                  <li><a href="#activity-cancellation">Activity Cancellation</a></li>
-                  <li><a href="#workflow-versioning">Workflow Versioning</a></li>
-                  <li><a href="#child-workflows">Child Workflows</a></li>
-                  <li><a href="#continue-as-new">Continue-As-New</a></li>
-                  <li><a href="#side-effects">Side Effects</a></li>
-                  <li><a href="#local-activities">Local Activities</a></li>
-                  <li><a href="#mutations">Mutations</a></li>
+                  <li>Note: Topics moved to relevant sections.</li>
               </ul>
           </li>
           <li><a href="#testing">Testing</a>
@@ -516,6 +519,41 @@ class YourWorkflow implements YourWorkflowInterface
               </div>
           </article>
 
+          <article id="workflow-registration">
+              <h3>Workflow Registration</h3>
+              <p>
+              Workers need to know which Workflow implementations correspond to the Workflow Types requested by
+              Workflows. This is done by registering Workflow implementations with the Worker.
+              </p>
+              <p>
+              <strong>Note:</strong> This is typically done automatically by the SDK when you start a Workflow, but
+              it's good to understand the concept for manual registration.
+              </p>
+              <pre><code class="plaintext"># Pseudocode for Workflow registration
+
+# --- Original Code ---
+# result = await workflow.execute_activity(activity_A, ...)
+
+# --- Updated Code ---
+# We want to optionally call activity_B before activity_A
+
+# Change ID identifies this specific patch/change
+patch_change_id = "add-activity-B-call-v1"
+
+# Default version (original behavior) is -1 (or some SDK-specific default)
+# New version is 1 (or the next sequential number for this change ID)
+version = workflow.get_version(patch_change_id, default=-1, max_supported=1)
+
+if version == 1:
+    # New code path: Call B first
+    await workflow.execute_activity(activity_B, ...)
+
+# Code common to both versions (or the original path if version == -1)
+result = await workflow.execute_activity(activity_A, ...)
+
+</code></pre>
+          </article>
+
           <article id="workflow-constraints">
               <h3>Workflow Constraints (Determinism)</h3>
               <p>
@@ -557,56 +595,487 @@ class YourWorkflow implements YourWorkflowInterface
               to handle non-deterministic logic when absolutely necessary.
               </p>
           </article>
-        </section>
-        <!-- End Workflow Development Section -->
 
-        <!-- Activity Development Section -->
-        <section id="activity-development">
-          <h2>Activity Development</h2>
-          <p>
-              Activities encapsulate the actual business logic, performing tasks like calling external services,
-              interacting with databases, or processing data. They are executed by Workers and can be retried
-              automatically.
-          </p>
-
-          <article id="activity-definition">
-              <h3>Activity Definition</h3>
+          <article id="workflow-versioning">
+              <h3>Workflow Versioning (Patching)</h3>
               <p>
-              Define Activities using interfaces (Java, Go, PHP), functions (Python, TypeScript), or methods within
-              classes (.NET).
+              Since Workflow code must be deterministic, deploying updated Workflow code that changes the sequence of
+              commands (like adding a new Activity call, removing a Timer) can break replays of existing, in-flight
+              Workflow Executions that were started with the old code.
+              </p>
+              <p>
+              The <code>Workflow.getVersion</code> API (or equivalent in each SDK) allows you to safely deploy changes to
+              Workflow definitions without breaking compatibility.
+              </p>
+              <ol>
+              <li>
+                  Wrap the new or modified logic within a <code>getVersion</code> block, assigning it a unique change ID (often an
+                  integer or descriptive string).
+              </li>
+              <li>
+                  Specify a default version (typically associated with the original code path) and the new version
+                  (associated with the changed code path).
+              </li>
+              <li>
+                  When a Worker executes this code during a replay: If the history already contains a marker for this
+                  change ID, the SDK automatically executes the code path corresponding to the recorded version.
+              </li>
+              <li>
+                  When a Worker executes this code for the *first time* (not a replay for this specific part), it
+                  executes the code associated with the *new* version you specified and records that version marker in the
+                  history.
+              </li>
+              </ol>
+              <p>
+              This ensures that existing executions continue deterministically along their original path, while new
+              executions (or executions reaching this point for the first time) use the updated logic.
+              </p>
+              <pre><code class="plaintext"># Pseudocode for using getVersion
+
+# --- Original Code ---
+# result = await workflow.execute_activity(activity_A, ...)
+
+# --- Updated Code ---
+# We want to optionally call activity_B before activity_A
+
+# Change ID identifies this specific patch/change
+patch_change_id = "add-activity-B-call-v1"
+
+# Default version (original behavior) is -1 (or some SDK-specific default)
+# New version is 1 (or the next sequential number for this change ID)
+version = workflow.get_version(patch_change_id, default=-1, max_supported=1)
+
+if version == 1:
+    # New code path: Call B first
+    await workflow.execute_activity(activity_B, ...)
+
+# Code common to both versions (or the original path if version == -1)
+result = await workflow.execute_activity(activity_A, ...)
+
+</code></pre>
+              <p>
+              After all in-flight Workflows using the old code path (default version) have completed, you can remove
+              the <code>getVersion</code> call and the old code path, simplifying the Workflow definition.
+              </p>
+              <p>
+              <strong>Note:</strong> Build ID based Worker Versioning is a newer, often preferred approach for managing incompatible Worker code deployments, especially across multiple Task Queues or complex rollouts. Patching is useful for targeted, small changes within a single Workflow definition.
+              </p>
+          </article>
+
+          <article id="child-workflows">
+              <h3>Execute Child Workflows</h3>
+              <p>
+              Workflows can start other Workflows, known as Child Workflows. This allows for modular design, breaking
+              down complex business processes into smaller, reusable, and independently testable units.
+              </p>
+              <p>Key characteristics of Child Workflows:</p>
+              <ul>
+              <li>
+                  <strong>Independent History:</strong> Each Child Workflow has its own separate event history.
+              </li>
+              <li>
+                  <strong>Parent Relationship:</strong> The parent Workflow can track the status of the child and receive
+                  its result upon completion.
+              </li>
+              <li>
+                  <strong>Cancellation Propagation:</strong> Cancellation can be configured to propagate from parent to
+                  child (or not).
+              </li>
+              <li>
+                  <strong>Retries and Timeouts:</strong> Child Workflows have their own timeouts and retry policies,
+                  independent of the parent.
+              </li>
+              <li>
+                  <strong>Task Queues:</strong> Child Workflows can run on the same or different Task Queues as the parent.
+              </li>
+              </ul>
+              <p>
+              Starting a Child Workflow is similar to starting a Workflow via the Client, but it's done from within the
+              parent Workflow's code using specific SDK functions (for example, <code>workflow.ExecuteChildWorkflow</code>). Options
+              control the parent-child relationship behavior (for example, what happens if the parent completes before the
+              child).
               </p>
 
-              <!-- Tabs for Activity Definition -->
+              <!-- Tabs for Child Workflows -->
               <div class="tab-container">
-                  <div class="tab-buttons">
-                      <button class="tab-button" data-tab-target="activity-def-ts">
-                          TypeScript
-                      </button>
-                      <button class="tab-button" data-tab-target="activity-def-py">
-                          Python
-                      </button>
-                      <button class="tab-button" data-tab-target="activity-def-go">
-                          Go
-                      </button>
-                      <button class="tab-button" data-tab-target="activity-def-java">
-                          Java
-                      </button>
-                      <button class="tab-button" data-tab-target="activity-def-dotnet">
-                          .NET
-                      </button>
-                      <button class="tab-button" data-tab-target="activity-def-php">
-                          PHP
-                      </button>
-                  </div>
-                  <!-- Tab content divs moved inside tab-container -->
-                  <div class="tab-content" id="activity-def-ts">
-                      <h4>TypeScript</h4>
-                      <p>
-                          Define Activities as plain async functions. You can optionally group them in an object or class for
-                          organization. Activity arguments and return types must be serializable by the configured Data
-                          Converter (JSON by default). Use <code>Context.current().info</code> to access Activity information like Task Token.
-                      </p>
-                      <pre><code class="language-typescript">import { Context } from '@temporalio/activity';
+                <div class="tab-buttons"> <!-- Added wrapper div for buttons -->
+                  <button class="tab-button" data-tab-target="child-wf-ts">
+                      TypeScript
+                  </button>
+                  <button class="tab-button" data-tab-target="child-wf-py">
+                      Python
+                  </button>
+                  <button class="tab-button" data-tab-target="child-wf-go">
+                      Go
+                  </button>
+                  <button class="tab-button" data-tab-target="child-wf-java">
+                      Java
+                  </button>
+                  <button class="tab-button" data-tab-target="child-wf-dotnet">
+                      .NET
+                  </button>
+                  <button class="tab-button" data-tab-target="child-wf-php">
+                      PHP
+                  </button>
+                </div>
+
+                <!-- Tab content divs moved inside tab-container -->
+                <div class="tab-content" id="child-wf-ts">
+                  <h4>TypeScript</h4>
+                  <pre><code class="language-typescript">import { executeChild, proxyActivities, ParentClosePolicy, workflowInfo } from '@temporalio/workflow'; // Import workflowInfo
+import { childWorkflow } from './child'; // Assume childWorkflow definition exists
+
+export async function parentWorkflow(name: string): Promise&lt;string&gt; {
+    // Start child and wait for result
+    const result = await executeChild(childWorkflow, {
+        args: [name],
+        workflowId: `child-${workflowInfo().workflowId}`, // Ensure unique child ID using workflowInfo
+        // Default: ParentClosePolicy.TERMINATE (terminates child if parent closes)
+        // Use ABANDON if child should continue after parent finishes
+        parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+    });
+    return `Parent received: ${result}`;
+}</code></pre>
+                </div>
+
+                <div class="tab-content" id="child-wf-py">
+                  <h4>Python</h4>
+                  <pre><code class="language-python">from temporalio import workflow
+from temporalio.common import ParentClosePolicy
+# Assume child_workflow is defined in another file/module
+with workflow.unsafe.imports_passed_through():
+    from child_workflows import ChildWorkflow
+
+@workflow.defn
+class ParentWorkflow:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        result = await workflow.execute_child_workflow(
+            ChildWorkflow.run,
+            f"Input for {name}",
+            id=f"child-{workflow.info().workflow_id}",
+            parent_close_policy=ParentClosePolicy.ABANDON,
+        )
+        return f"Parent received: {result}"
+                </code></pre>
+                </div>
+
+                <div class="tab-content" id="child-wf-go">
+                  <h4>Go</h4>
+                  <pre><code class="language-go">package app // Assuming parent workflow is in app package
+
+import (
+"fmt" // For string formatting
+"go.temporal.io/sdk/workflow"
+"go.temporal.io/api/enums/v1"
+// Assume app defines ChildWorkflow function
+"your_module/app"
+)
+
+func ParentWorkflow(ctx workflow.Context, name string) (string, error) {
+    cwo := workflow.ChildWorkflowOptions{
+        // Generate a unique ID, e.g., combining parent ID and a unique part
+        WorkflowID: fmt.Sprintf("child-%s-%s", workflow.GetInfo(ctx).WorkflowExecution.ID, workflow.GetRandomUUID(ctx)),
+        ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
+    }
+    ctx = workflow.WithChildOptions(ctx, cwo)
+
+    var result string
+    // Assuming ChildWorkflow is defined in the same package or imported correctly
+    future := workflow.ExecuteChildWorkflow(ctx, app.ChildWorkflow, name)
+    if err := future.Get(ctx, &result); err != nil {
+        // Handle child workflow error (e.g., log, return error)
+        workflow.GetLogger(ctx).Error("Child workflow failed", "Error", err)
+        return "", err
+    }
+    return "Parent received: " + result, nil
+}
+
+// Assume ChildWorkflow definition exists, e.g.:
+// func ChildWorkflow(ctx workflow.Context, inputName string) (string, error) {
+//     workflow.GetLogger(ctx).Info("Child workflow started", "Input", inputName)
+//     return "Result from child for " + inputName, nil
+// }
+                </code></pre>
+            </div>
+
+              <div class="tab-content" id="child-wf-java">
+                <h4>Java</h4>
+                <pre><code class="language-java">package your.application.workflows; // Use your actual package name
+
+import io.temporal.workflow.*;
+import io.temporal.api.enums.v1.ParentClosePolicy;
+import java.util.UUID; // For UUIDs
+// Assume ChildWorkflow interface exists in the same package or imported
+
+public class ParentWorkflowImpl implements ParentWorkflow { // Assuming ParentWorkflow interface
+    @Override
+    public String execute(String name) {
+        ChildWorkflowOptions options = ChildWorkflowOptions.newBuilder()
+            .setWorkflowId("child-" + Workflow.getInfo().getWorkflowId() + "-" + UUID.randomUUID().toString()) // Ensure unique ID
+            .setParentClosePolicy(ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON)
+            .build();
+
+        ChildWorkflow child = Workflow.newChildWorkflowStub(ChildWorkflow.class, options);
+
+        // Start child and wait for result
+        String result = child.execute("Input for " + name);
+        return "Parent received: " + result;
+
+        // To start asynchronously:
+        // Promise<String> promise = Async.function(child::execute, "Input for " + name);
+        // Use promise.get() later
+    }
+}</code></pre>
+              </div>
+
+              <div class="tab-content" id="child-wf-dotnet">
+                <h4>.NET</h4>
+                <pre><code class="language-csharp">using Temporalio.Workflows;
+using Temporalio.Common; // For ParentClosePolicy
+using System; // For Guid
+using System.Threading.Tasks;
+using YourApplication.Workflows; // Assuming ChildWorkflow class exists in the same namespace or imported
+
+[Workflow]
+public class ParentWorkflow
+{
+    [WorkflowRun]
+    public async Task&lt;string&gt; RunAsync(string name)
+    {
+        string result = await Workflow.ExecuteChildWorkflowAsync(
+            (ChildWorkflow wf) => wf.RunChildAsync($"Input for {name}"), // Ensure RunChildAsync exists on ChildWorkflow
+            new ChildWorkflowOptions
+            {
+                WorkflowId = $"child-{Workflow.Info.WorkflowId}-{Guid.NewGuid()}", // Ensure unique ID
+                ParentClosePolicy = ParentClosePolicy.Abandon,
+            }
+        );
+        return $"Parent received: {result}";
+    }
+}</code></pre>
+              </div>
+
+              <div class="tab-content" id="child-wf-php">
+                <h4>PHP</h4>
+                <pre><code class="language-php">&lt;?php declare(strict_types=1);\\\n\\\nnamespace App\\\\\\\\Workflow;\\\\n\\\\nuse Temporal\\\\\\\\Workflow\\\\\\\\ParentWorkflowInterface;\\\\nuse Temporal\\\\\\\\Workflow\\\\\\\\ParentWorkflowMethod;\\\\nuse Temporal\\\\\\\\Activity\\\\\\\\ActivityOptions;\\\\nuse Temporal\\\\\\\\Common\\\\\\\\RetryOptions;\\\\nuse Temporal\\\\\\\\Activity\\\\\\\\ActivityMethod;\\\\nuse Temporal\\\\\\\\Activity\\\\\\\\ActivityInterface;\\\\nuse App\\\\\\\\ChildWorkflows\\\\\\\\ChildWorkflow;\\\\nuse Ramsey\\\\Uuid\\\\Uuid; // Example: Use ramsey/uuid\\\\n\\\\n// Define ParentWorkflow interface and implementation\\\\ninterface ParentWorkflowInterface extends ParentWorkflowInterface&lt;?&gt; {\\\n    @ParentWorkflowMethod(name = "ParentWorkflow")\\\n    void execute(String name);\n}\\\n\\\\nclass ParentWorkflowImpl implements ParentWorkflowInterface {\\\n    @Override\\\n    @ParentWorkflowMethod(name = "ParentWorkflow")\\\n    public void execute(String name) {\\\n        // Start child workflow\\\n        ChildWorkflow.start(\\\"child-workflow\\\", [\\\"name\\\" => $name]);\\\\\n        // You can also use a different workflow ID if needed\\\\\n    }\\\\\n}\\\n?&gt;</code></pre>
+              </div>
+            </div> <!-- End tab-container -->
+        </article>
+
+        <article id="continue-as-new">
+            <h3>Continue-As-New</h3>
+            <p>
+            Workflow Executions have limits on their event history size and duration. For long-running processes
+            or Workflows that accumulate a large history (for example, loops processing many items), `Continue-As-New` allows
+            a Workflow to effectively restart itself with a fresh history, carrying over necessary state.
+            </p>
+            <p>When a Workflow decides to `Continue-As-New`:</p>
+            <ol>
+            <li>It specifies the same Workflow Type (or potentially a different one).</li>
+            <li>It provides the input arguments for the *new* execution. This is how state is carried over.</li>
+            <li>The current execution is marked as `ContinuedAsNew`.</li>
+            <li>A new Workflow Execution starts immediately with the provided arguments and a clean history, but
+                logically continues the business process. The Run ID changes, but the Workflow ID can be kept the same.
+            </li>
+            </ol>
+            <p>
+            This is the standard pattern for implementing infinite loops or processes that need to run indefinitely
+            without hitting history limits. It's also useful for periodic cleanup of large state within a Workflow.
+            </p>
+            <pre><code class="plaintext"># Pseudocode for Continue-As-New loop
+
+@workflow.defn
+class PerpetualWorkflow:
+    @workflow.run
+    async def run(self, counter: int, other_state: dict = None): # Example with state
+        if other_state is None:
+            other_state = {} # Initialize state if first run
+
+        workflow.logger.info(f"Executing run {counter} with state: {other_state}")
+
+        # Example condition to ContinueAsNew (e.g., every 1000 iterations)
+        if counter > 0 and counter % 1000 == 0:
+            workflow.logger.info(f"Processed {counter} items, continuing as new...")
+            # Carry over the necessary state to the new execution
+            # Only include state needed for the *next* run
+            workflow.continue_as_new(counter, other_state) # Restarts run() with new args
+            # Note: Code after continue_as_new does not execute in the current run
+
+        # --- Regular Workflow Logic ---
+        workflow.logger.info(f"Processing item {counter}")
+        # Do work... update other_state if needed
+        # await workflow.execute_activity(process_item, counter, other_state, ...)
+        other_state['last_processed'] = counter
+        await workflow.sleep(timedelta(seconds=1)) # Simulate work or delay
+
+        # "Loop" by calling continue_as_new with updated state for the next iteration
+        workflow.continue_as_new(counter + 1, other_state)
+
+# Client side starting the workflow for the first time:
+    async def run(self, counter: int):
+        if counter >= 1000: # Example condition to ContinueAsNew
+            print(f"Processed {counter} items, continuing as new...")
+            # Carry over the counter state to the new execution
+            workflow.continue_as_new(counter) # Restarts run() with counter
+        else:
+            print(f"Processing item {counter}")
+            # Do work...
+            await workflow.execute_activity(process_item, counter, ...)
+
+            # Schedule next iteration after a delay
+            await workflow.sleep(timedelta(seconds=10))
+            # "Loop" by calling continue_as_new with updated state
+            workflow.continue_as_new(counter + 1)
+</code></pre>
+        </article>
+
+        <article id="side-effects">
+            <h3>Side Effects</h3>
+            <p>
+            While Workflows must be deterministic, sometimes you need to execute a short, non-deterministic piece of
+            code within the Workflow logic itself (without calling an Activity). A common example is generating a UUID
+            or getting a random number using a non-SDK function (which would violate determinism if called directly).
+            </p>
+            <p>
+            <code>Workflow.SideEffect</code> (or equivalent) allows this.
+            </p>
+            <ol>
+            <li>You provide a function/lambda containing the non-deterministic code to <code>SideEffect</code>.</li>
+            <li>The first time this code path is executed, the function is run, and its return value is recorded in the
+                Workflow history.</li>
+            <li>During replays, the function is *not* re-executed. Instead, the recorded value from the history is
+                returned directly, preserving determinism.</li>
+            </ol>
+            <p>
+            Side Effects should only be used for short, simple operations where creating a dedicated Activity would be
+            overkill. They are not suitable for I/O or long-running computations. For example, generating a unique ID or
+            calling a potentially flaky function that you don't want to retry as a full Activity.
+            </p>
+            <pre><code class="plaintext"># Pseudocode for Side Effect
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self):
+        # Generate a random ID using a potentially non-deterministic library function
+        # This lambda is only executed once per execution path.
+        random_id = await workflow.side_effect(lambda: generate_random_id_maybe_impure())
+
+        # Use the random_id, which is now deterministic for replays
+        await workflow.execute_activity(use_id_activity, random_id, ...)
+
+        return f"Processed with ID: {random_id}"
+
+# Note: For truly random values needed within workflow logic,
+# prefer the SDK's deterministic random functions like workflow.random().
+# SideEffect is more for integrating short non-deterministic external code.
+</code></pre>
+        </article>
+
+        <article id="local-activities">
+            <h3>Local Activities</h3>
+            <p>
+            Local Activities are an optimization for short-lived Activities that don't require the full overhead
+            of Task Queue polling, scheduling, and retries managed by the Temporal Cluster. They execute directly
+            within the Worker's Workflow Task processing thread.
+            </p>
+            <p>Characteristics:</p>
+            <ul>
+            <li>
+                <strong>Execution:</strong> Run in the same process as the Workflow code that called them.
+            </li>
+            <li>
+                <strong>Latency:</strong> Much lower invocation latency compared to standard Activities (sub-millisecond).
+            </li>
+            <li>
+                <strong>Retries:</strong> Limited, server-side retries are not applicable. Retries must be handled by the
+                Workflow code itself or rely on the Workflow Task retry mechanism. A short, configurable local retry policy might be available in the SDK.
+            </li>
+            <li>
+                <strong>Timeouts:</strong> Subject to shorter, locally configured timeouts, often tied to the Workflow
+                Task timeout.
+            </li>
+            <li>
+                <strong>Use Cases:</strong> Ideal for simple functions like data validation, transformation, short calculations,
+                or accessing read-only resources local to the Worker, where the overhead of a standard Activity is
+                undesirable. For example, validating input against a schema loaded in Worker memory.
+            </li>
+            <li>
+                <strong>Determinism:</strong> Like standard Activities, Local Activities themselves do not need to be
+                deterministic, but their *invocation* from the Workflow must be.
+            </li>
+            </ul>
+            <p>
+            Executing a Local Activity uses a specific SDK function (for example, <code>workflow.ExecuteLocalActivity</code>), often
+            requiring different, shorter timeout configurations than standard Activities.
+            </p>
+        </article>
+
+        <article id="mutations">
+            <h3>Mutations</h3>
+            <p>
+            The <code>Workflow.upsertMemo</code>, <code>Workflow.upsertSearchAttributes</code> APIs allow Workflows to update their own Memo and
+            Search Attributes during execution. These updates are recorded in the event history.
+            </p>
+            <p>
+            <code>Workflow.deprecatePatch</code> is used in conjunction with <code>Workflow.getVersion</code> for managing code cleanup. Once you are
+            sure no running Workflows are using an old code path identified by a specific change ID (patch ID), you
+            can call `deprecatePatch(patch_change_id)`. This signals to the system (and potentially linting tools)
+            that this patch ID is obsolete and its corresponding `getVersion` block can eventually be removed from the
+            code.
+            </p>
+        </article>
+      </section>
+      <!-- End Workflow Development Section -->
+
+      <!-- Activity Development Section -->
+      <section id="activity-development">
+        <h2>Activity Development</h2>
+        <p>
+            Activities encapsulate the actual business logic, performing tasks like calling external services,
+            interacting with databases, or processing data. They are executed by Workers and can be retried
+            automatically.
+        </p>
+
+        <article id="activity-definition">
+            <h3>Activity Definition</h3>
+            <p>
+            Define Activities using interfaces (Java, Go, PHP), functions (Python, TypeScript), or methods within
+            classes (.NET).
+            </p>
+
+            <!-- Tabs for Activity Definition -->
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-button" data-tab-target="activity-def-ts">
+                        TypeScript
+                    </button>
+                    <button class="tab-button" data-tab-target="activity-def-py">
+                        Python
+                    </button>
+                    <button class="tab-button" data-tab-target="activity-def-go">
+                        Go
+                    </button>
+                    <button class="tab-button" data-tab-target="activity-def-java">
+                        Java
+                    </button>
+                    <button class="tab-button" data-tab-target="activity-def-dotnet">
+                        .NET
+                    </button>
+                    <button class="tab-button" data-tab-target="activity-def-php">
+                        PHP
+                    </button>
+                </div>
+                <!-- Tab content divs moved inside tab-container -->
+                <div class="tab-content" id="activity-def-ts">
+                    <h4>TypeScript</h4>
+                    <p>
+                        Define Activities as plain async functions. You can optionally group them in an object or class for
+                        organization. Activity arguments and return types must be serializable by the configured Data
+                        Converter (JSON by default). Use <code>Context.current().info</code> to access Activity information like Task Token.
+                    </p>
+                    <pre><code class="language-typescript">import { Context } from '@temporalio/activity';
 import { log } from './logger'; // Assuming a configured logger
 
 export async function composeGreeting(greeting: string, name: string): Promise&lt;string&gt; {
@@ -622,16 +1091,16 @@ return \`\${greeting}, \${name}!\`;
 
 // Optional: Group activities
 export const activities = { composeGreeting };</code></pre>
-                  </div>
+                </div>
 
-                  <div class="tab-content" id="activity-def-py">
-                      <h4>Python</h4>
-                      <p>
-                          Define Activities using the <code>@activity.defn</code> decorator on functions. Activity arguments and return
-                          types must be serializable (Defaults to JSON). Use <code>activity.info()</code> to access Activity
-                          information.
-                      </p>
-                      <pre><code class="language-python">from temporalio import activity
+                <div class="tab-content" id="activity-def-py">
+                    <h4>Python</h4>
+                    <p>
+                        Define Activities using the <code>@activity.defn</code> decorator on functions. Activity arguments and return
+                        types must be serializable (Defaults to JSON). Use <code>activity.info()</code> to access Activity
+                        information.
+                    </p>
+                    <pre><code class="language-python">from temporalio import activity
 import time
 
 @activity.defn
@@ -648,16 +1117,16 @@ async def do_async_work(value: int) -> int:
     await asyncio.sleep(1)
     return value * 10
 </code></pre>
-                  </div>
+                </div>
 
-                  <div class="tab-content" id="activity-def-go">
-                      <h4>Go</h4>
-                      <p>
-                          Define Activities as functions or methods on a struct. The function signature must include
-                          <code>context.Context</code> as the first argument. Arguments and return values must be serializable (JSON by
-                          default). Use <code>activity.GetInfo(ctx)</code> to access information.
-                      </p>
-                      <pre><code class="language-go">package app
+                <div class="tab-content" id="activity-def-go">
+                    <h4>Go</h4>
+                    <p>
+                        Define Activities as functions or methods on a struct. The function signature must include
+                        <code>context.Context</code> as the first argument. Arguments and return values must be serializable (JSON by
+                        default). Use <code>activity.GetInfo(ctx)</code> to access information.
+                    </p>
+                    <pre><code class="language-go">package app
 
 import (
 "context"
@@ -695,15 +1164,15 @@ logger.Info("Sending notification", "UserID", userID, "Message", message)
 return nil
 }
 </code></pre>
-                  </div>
+                </div>
 
-                  <div class="tab-content" id="activity-def-java">
-                      <h4>Java</h4>
-                      <p>
-                          Define an Activity interface annotated with <code>@ActivityInterface</code>. Each method in the
-                          interface defines an Activity Type. Implement this interface.
-                      </p>
-                      <pre><code class="language-java">package your.application.activities; // Use your actual package name
+                <div class="tab-content" id="activity-def-java">
+                    <h4>Java</h4>
+                    <p>
+                        Define an Activity interface annotated with <code>@ActivityInterface</code>. Each method in the
+                        interface defines an Activity Type. Implement this interface.
+                    </p>
+                    <pre><code class="language-java">package your.application.activities; // Use your actual package name
 
 import io.temporal.activity.ActivityInterface;
 import io.temporal.activity.ActivityMethod;
@@ -733,15 +1202,15 @@ public class YourActivitiesImpl implements YourActivities {
         return true;
     }
 }</code></pre>
-                  </div>
+                </div>
 
-                  <div class="tab-content" id="activity-def-dotnet">
-                      <h4>.NET</h4>
-                      <p>
-                          Define Activity methods within any class, marking them with the <code>[Activity]</code> attribute.
-                          Methods can be static or instance methods.
-                      </p>
-                      <pre><code class="language-csharp">using Temporalio.Activities;
+                <div class="tab-content" id="activity-def-dotnet">
+                    <h4>.NET</h4>
+                    <p>
+                        Define Activity methods within any class, marking them with the <code>[Activity]</code> attribute.
+                        Methods can be static or instance methods.
+                    </p>
+                    <pre><code class="language-csharp">using Temporalio.Activities;
 using System.Threading.Tasks;
 
 public class MyActivities
@@ -761,15 +1230,15 @@ public class MyActivities
         return $"Static result: {value * 2}";
     }
 }</code></pre>
-                  </div>
+                </div>
 
-                  <div class="tab-content" id="activity-def-php">
-                      <h4>PHP</h4>
-                      <p>
-                          Define an Activity interface annotated with <code>#[ActivityInterface]</code>. Each method defines an
-                          Activity Type. Implement this interface.
-                      </p>
-                      <pre><code class="language-php">&lt;?php
+                <div class="tab-content" id="activity-def-php">
+                    <h4>PHP</h4>
+                    <p>
+                        Define an Activity interface annotated with <code>#[ActivityInterface]</code>. Each method defines an
+                        Activity Type. Implement this interface.
+                    </p>
+                    <pre><code class="language-php">&lt;?php
 
 namespace App\Activity;
 
@@ -805,22 +1274,22 @@ class YourActivities implements YourActivityInterface
     }
 }
 ?&gt;</code></pre>
-                  </div>
-              </div> <!-- End tab-container -->
-          </article>
+                </div>
+            </div> <!-- End tab-container -->
+        </article>
 
-          <article id="activity-context">
-              <h3>Activity Context and Information</h3>
-              <p>
-              Activities can access metadata about their current execution, such as the Workflow ID, Activity ID, Task
-              Token (needed for asynchronous completion), and configured timeouts. This is typically done via a
-              context object or static methods provided by the SDK. Logging within Activities should ideally use the
-              SDK's logger, which automatically includes this contextual information.
-              </p>
-              <p>
-              Example: Accessing Activity Info (Conceptual - specific methods vary by SDK as shown in definition examples)
-              </p>
-              <pre><code class="plaintext"># Inside an Activity...
+        <article id="activity-context">
+            <h3>Activity Context and Information</h3>
+            <p>
+            Activities can access metadata about their current execution, such as the Workflow ID, Activity ID, Task
+            Token (needed for asynchronous completion), and configured timeouts. This is typically done via a
+            context object or static methods provided by the SDK. Logging within Activities should ideally use the
+            SDK's logger, which automatically includes this contextual information.
+            </p>
+            <p>
+            Example: Accessing Activity Info (Conceptual - specific methods vary by SDK as shown in definition examples)
+            </p>
+            <pre><code class="plaintext"># Inside an Activity...
 activity_info = get_current_activity_info()
 workflow_id = activity_info.workflow_id
 activity_id = activity_info.activity_id
@@ -992,96 +1461,160 @@ use Temporal\\\\WorkerFactory;\nuse App\\\\YourWorkflow; // Assuming Workflow im
             </div> <!-- End tab-container -->
         </article>
 
-        <article id="start-worker">
-            <h3>Start a Worker</h3>
+        <article id="activity-heartbeating">
+            <h3>Activity Heartbeating</h3>
             <p>
-            Starting a Worker involves creating a Worker object configured with the Temporal Client connection, Task
-            Queue name, and registered Workflow/Activity types, and then calling its run/start method.
+            For long-running Activities, Heartbeating allows the Activity to report its progress and liveness back to
+            the Temporal Cluster. This serves several purposes:
             </p>
+            <ul>
+            <li>
+                <strong>Liveness Detection:</strong> If the Cluster doesn't receive a heartbeat within the configured
+                <code>HeartbeatTimeout</code>, it assumes the Activity Worker has crashed and reschedules the Activity (respecting
+                the Retry Policy).
+            </li>
+            <li>
+                <strong>Progress Checkpointing:</strong> Activities can include details (payload) with the heartbeat,
+                effectively checkpointing their progress. If the Activity is retried (on the same or different
+                Worker), it can retrieve the last checkpointed details from the Activity context and resume from that
+                point, avoiding redundant work.
+            </li>
+            <li>
+                <strong>Cancellation Check:</strong> The heartbeat mechanism also allows the Activity to check if a
+                cancellation has been requested for the Workflow or the Activity itself. The Activity can then perform
+                cleanup and exit gracefully.
+            </li>
+            </ul>
             <p>
-            The run/start method typically blocks, continuously polling the Task Queue and executing tasks until the
-            process is terminated or an explicit stop signal is received.
+            Heartbeating is crucial for Activities that might run longer than the <code>StartToCloseTimeout</code> or for tasks where
+            reporting progress is beneficial. It's implemented by calling a specific SDK function (for example, <code>activity.RecordHeartbeat(ctx, details...)</code>) periodically within the Activity code.
             </p>
-            <pre><code class="plaintext"># Pseudocode for starting a worker
-client = connect_to_temporal("localhost:7233")
+            <pre><code class="plaintext"># Pseudocode for Activity with Heartbeating
+@activity.defn
+async def long_running_task(input_data):
+    progress = load_progress_from_details(activity.info().heartbeat_details)
+    if progress is None:
+        progress = 0
 
-worker = Worker(
-  client=client,
-  task_queue="your-task-queue-name",
-  workflows=[YourWorkflowImplementation],
-  activities=[your_activity_function_or_instance]
-)
+    total_items = len(input_data)
+    for i in range(progress, total_items):
+        # Check for cancellation before/during work
+        activity.heartbeat(i) # Report progress (item 'i' is about to be processed)
 
-print("Starting Worker...")
-worker.run() # Blocks until interrupted/stopped
-print("Worker stopped.")
+        # Process item i...
+        await asyncio.sleep(1) # Simulate work
+
+        # Optional: Heartbeat again after processing item, if fine-grained needed
+        # activity.heartbeat(i + 1)
+
+    return "All items processed"
+
+def load_progress_from_details(details):
+    # Logic to interpret details sent with previous heartbeat
+    if details: return details # Assuming details itself is the progress marker
+    return None
+</code></pre>
+            <p>
+            <strong>Note:</strong> Build ID based Worker Versioning is a newer, often preferred approach for managing incompatible Worker code deployments, especially across multiple Task Queues or complex rollouts. Patching is useful for targeted, small changes within a single Workflow definition.
+            </p>
+        </article>
+
+        <article id="activity-async-completion">
+            <h3>Complete Activities Asynchronously</h3>
+            <p>
+            In some scenarios, the process that completes an Activity might be different from the one that started it.
+            For example, an Activity might trigger an external system (via API call) and rely on a webhook callback to
+            signal completion.
+            </p>
+            <p>To handle this:</p>
+            <ol>
+            <li>
+                The Activity obtains its unique <code>TaskToken</code> from the Activity Context. The Task Token identifies this
+                specific Activity execution attempt.
+            </li>
+            <li>
+                The Activity returns control to the Worker *without* completing, typically by throwing/returning a
+                special indicator (like <code>activity.DoNotCompleteOnReturn</code> or a specific exception type).
+            </li>
+            <li>
+                The Activity passes the <code>TaskToken</code> to the external system or process that will eventually signal
+                completion.
+            </li>
+            <li>
+                When the external process finishes, it uses a Temporal Client method (like <code>CompleteActivityById</code> or
+                <code>CompleteActivity</code>, providing the Task Token) to report the result or failure back to the Temporal
+                Cluster.
+            </li>
+            </ol>
+            <p>
+            The Worker that originally executed the Activity does not need to be running for the completion call to
+            succeed. The Temporal Cluster uses the Task Token to correlate the completion call with the correct
+            Workflow Execution.
+            </p>
+            <pre><code class="plaintext"># Pseudocode for Activity triggering async completion
+
+@activity.defn
+async def trigger_external_job(job_params):
+    info = activity.info()
+    task_token_str = info.task_token.decode('utf-8') # Get task token as string
+
+    # Call external system, passing task_token_str as a callback identifier
+    external_api.start_job(job_params, callback_token=task_token_str)
+
+    # Tell the Worker not to complete this Activity yet
+    activity.do_not_complete_on_return()
+
+
+# --- Elsewhere, in a separate process (e.g., webhook handler) ---
+
+def handle_external_job_completion(callback_token, result, error):
+    client = connect_to_temporal() # Connect with a Temporal client
+    task_token_bytes = callback_token.encode('utf-8')
+
+    try:
+        if error:
+            client.report_activity_failure(task_token_bytes, error)
+        else:
+            client.report_activity_completion(task_token_bytes, result)
+    except Exception as e:
+        # Handle potential errors reporting completion (e.g., activity timed out already)
+        log.error(f"Failed to report activity completion/failure for token {callback_token}: {e}")
+
 </code></pre>
         </article>
 
-        <article id="worker-configuration">
-            <h3>Worker Configuration</h3>
+        <article id="activity-cancellation">
+            <h3>Activity Cancellation</h3>
             <p>
-            Workers offer various configuration options to tune performance, resource usage, and behavior:
+            Activities can be cancelled in two main ways:
+            </p>
+            <ol>
+            <li>
+                <strong>Workflow Cancellation:</strong> If the Workflow Execution that invoked the Activity is cancelled,
+                the Temporal Cluster propagates the cancellation request to running Activities (depending on the
+                Workflow's cancellation handling logic and SDK Cancellation Scopes).
+            </li>
+            <li>
+                <strong>Activity Timeouts:</strong> If an Activity exceeds its <code>StartToCloseTimeout</code> or <code>ScheduleToCloseTimeout</code>,
+                it is effectively cancelled by the timeout mechanism, and a failure is reported to the Workflow (which
+                may trigger retries).
+            </li>
+            </ol>
+            <p>
+            Activities that need to perform cleanup when cancelled (for example, releasing a lock, rolling back a transaction)
+            should check for cancellation requests. This is often done:
             </p>
             <ul>
-            <li>
-                <strong>Max Concurrent Activities:</strong> Limits the number of Activity Tasks executed concurrently.
-            </li>
-            <li>
-                <strong>Max Concurrent Workflow Tasks:</strong> Limits the number of Workflow Tasks executed
-                concurrently.
-            </li>
-            <li>
-                <strong>Task Queue Polling Intervals:</strong> Adjusts how frequently the Worker polls for tasks.
-            </li>
-            <li>
-                <strong>Identity:</strong> Sets a custom identity for the Worker, visible in logs and UI. Useful for
-                distinguishing between different Worker deployments.
-            </li>
-            <li>
-                <strong>Sticky Execution Options:</strong> Configures the behavior of Workflow state caching (for example, cache size).
-            </li>
-            <li>
-                <strong>Build ID / Versioning:</strong> Associates a Worker build/version identifier, enabling Worker Versioning features.
-            </li>
+            <li>Implicitly during <code>activity.RecordHeartbeat</code> calls.</li>
+            <li>Explicitly using SDK context cancellation checks (for example, <code>ctx.Err()</code> in Go, checking <code>Activity.Current.CancellationToken.IsCancellationRequested</code> in .NET, checking <code>activity.is_cancelled()</code> in Python).</li>
             </ul>
             <p>
-            Refer to the specific SDK documentation for the exact names and available options. Tuning these parameters
-            is crucial for optimizing Worker performance based on workload characteristics and available resources. For example,
-            I/O-bound Activities might benefit from higher concurrency, while CPU-bound Activities might require lower
-            concurrency matching available cores.
+            Upon detecting cancellation, the Activity should perform its cleanup and then typically throw a specific
+            cancelled exception type provided by the SDK.
             </p>
         </article>
-
-        <article id="worker-shutdown">
-            <h3>Worker Shutdown</h3>
-            <p>
-            Proper shutdown of Workers is important to ensure that in-progress tasks are handled gracefully.
-            </p>
-            <ul>
-            <li>
-                <strong>Graceful Shutdown:</strong> Most SDKs provide a way to initiate a graceful shutdown (for example, by
-                canceling a context or calling a `stop` method). The Worker stops polling for new tasks and waits
-                for a configurable period for existing tasks to complete.
-            </li>
-            <li>
-                <strong>Activity Shutdown:</strong> Running Activities are typically allowed to complete or might be sent a
-                cancellation request during graceful shutdown, depending on the SDK. Long-running Activities might need
-                explicit handling for cancellation or heartbeating to detect shutdown signals.
-            </li>
-            <li>
-                <strong>Workflow Task Shutdown:</strong> In-progress Workflow Tasks are usually completed quickly.
-            </li>
-            <li>
-                <strong>Forced Shutdown:</strong> If tasks do not complete within the grace period, the Worker process
-                exits. Any Activities that were running might need to rely on Temporal's timeouts and retries to be
-                rescheduled on another Worker. Workflow Task failures are handled by rescheduling the task with a
-                backoff.
-            </li>
-            </ul>
-</article>
-        </section>
-      <!-- End Worker Development Section -->
+      </section>
+      <!-- End Activity Development Section -->
 
       <!-- Temporal Client Section -->
       <section id="temporal-client">
@@ -1739,6 +2272,526 @@ try:
 except Exception as e:
   print(f"Failed to request cancellation: {e}")
 </code></pre>
+        </article>
+
+        <article id="update-workflows"> 
+            <h3>Update Workflows</h3>
+            <p>
+            Updates provide a way to synchronously mutate the state of a running Workflow Execution and receive a result. 
+            Unlike Signals (which are fire-and-forget), the Client sending an Update waits for confirmation that the 
+            Update has been received and validated by the Workflow, and can optionally wait for the Update handler 
+            logic within the Workflow to complete and return a value. Updates require a running Worker to process.
+            </p>
+            <p>
+            Workflows define Update handlers (and optional validators) to process these requests. Updates are useful for operations that need 
+            to modify Workflow state and confirm the result of that modification, such as incrementing a counter or 
+            changing a status, while ensuring the operation doesn't proceed if validation fails.
+            </p>
+
+            <h4>Sending an Update</h4>
+            <p>Use the Client to send an Update:</p>
+            <ul>
+            <li>Identify the target Workflow Execution (by Workflow ID).</li>
+            <li>Specify the Update name (defined in the Workflow).</li>
+            <li>Provide the Update arguments.</li>
+            <li>Wait for the Update to be accepted/rejected, and optionally wait for the result.</li>
+            </ul>
+            
+            <!-- Tabs for Sending Update -->
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-button" data-tab-target="update-wf-ts">
+                        TypeScript
+                    </button>
+                    <button class="tab-button" data-tab-target="update-wf-py">
+                        Python
+                    </button>
+                    <button class="tab-button" data-tab-target="update-wf-go">
+                        Go
+                    </button>
+                    <button class="tab-button" data-tab-target="update-wf-java">
+                        Java
+                    </button>
+                    <button class="tab-button" data-tab-target="update-wf-dotnet">
+                        .NET
+                    </button>
+                    <button class="tab-button" data-tab-target="update-wf-php">
+                        PHP
+                    </button>
+                </div>
+                <!-- Tab content divs inside tab-container -->
+                <div class="tab-content" id="update-wf-ts">
+                    <h4>TypeScript</h4>
+                    <pre><code class="language-typescript">import { Client } from '@temporalio/client';
+import { setLanguage } from './workflows'; // Assuming Update definition
+
+async function updateClient() {
+    const client = new Client();
+    const handle = client.workflow.getHandle('workflow-id-123');
+
+    // Execute update and wait for completion
+    const previousLanguage = await handle.executeUpdate(setLanguage, {
+        args: [Language.SPANISH], 
+    });
+    console.log(`Update completed, previous language: ${previousLanguage}`);
+
+    // Or, start update and get handle to wait for acceptance
+    // const updateHandle = await handle.startUpdate(setLanguage, {
+    //    args: [Language.FRENCH],
+    //    waitForStage: WorkflowUpdateStage.ACCEPTED,
+    // });
+    // console.log(`Update ${updateHandle.updateId} accepted.`);
+    // const result = await updateHandle.result(); // Wait for completion later
+}</code></pre>
+                </div>
+                <div class="tab-content" id="update-wf-py">
+                    <h4>Python</h4>
+                    <pre><code class="language-python">import asyncio
+from temporalio.client import Client
+# Assume workflow defines @workflow.update method 'set_language'
+
+async def update_workflow_client():
+    client = await Client.connect("localhost:7233")
+    handle = client.get_workflow_handle("workflow-id-123")
+
+    # Execute update and wait for completion
+    previous_language = await handle.execute_update("set_language", "spanish")
+    print(f"Update completed, previous language: {previous_language}")
+
+    # Or, start update and get handle to wait for acceptance
+    # update_handle = await handle.start_update("set_language", "french", wait_for_acceptance=True)
+    # print(f"Update {update_handle.id} accepted.")
+    # result = await update_handle.result() # Wait for completion later
+</code></pre>
+                </div>
+                <div class="tab-content" id="update-wf-go">
+                    <h4>Go</h4>
+                    <pre><code class="language-go">package main
+
+import (
+"context"
+"log"
+"time"
+"go.temporal.io/sdk/client"
+"your_module/app" // Assuming app defines SetLanguageUpdate string constant
+)
+
+func main() {
+    c, _ := client.Dial(client.Options{})
+    defer c.Close()
+
+    workflowID := "workflow-id-123"
+    
+    // Execute update and wait for completion
+    var previousLang string
+    updateValue, err := c.UpdateWorkflow(context.Background(), workflowID, "", app.SetLanguageUpdate, "spanish")
+    if err != nil {
+        log.Fatalln("Unable to execute update", err)
+    }
+    err = updateValue.Get(&previousLang)
+    if err != nil {
+        log.Fatalln("Unable to get update result", err)
+    }
+    log.Println("Update completed, previous language:", previousLang)
+
+    // Or, start update and get handle to wait for acceptance
+    // updateHandle, err := c.UpdateWorkflow(context.Background(), client.UpdateWorkflowOptions{
+    //	WorkflowID:   workflowID,
+    //	UpdateName:   app.SetLanguageUpdate,
+    //	WaitForStage: client.WorkflowUpdateStageAccepted,
+    //	Args:         []interface{}{"french"},
+    // })
+    // if err != nil { log.Fatalln("Unable to start update", err) }
+    // log.Println("Update accepted:", updateHandle.UpdateID())
+    // var result string
+    // err = updateHandle.Get(context.Background(), &result) // Wait for completion later
+}</code></pre>
+                </div>
+                <div class="tab-content" id="update-wf-java">
+                    <h4>Java</h4>
+                    <pre><code class="language-java">package your.application;
+
+import io.temporal.client.*;
+import io.temporal.serviceclient.WorkflowServiceStubs;
+import your.application.workflows.YourWorkflow; // Assume defines setLanguage(Language lang)
+import your.application.workflows.Language; 
+
+public class Updater {
+    public static void main(String[] args) {
+        WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs(); 
+        WorkflowClient client = WorkflowClient.newInstance(service);
+        String workflowId = "workflow-id-123";
+        YourWorkflow workflow = client.newWorkflowStub(YourWorkflow.class, workflowId);
+
+        // Execute update and wait for completion
+        try {
+            Language previousLanguage = workflow.setLanguage(Language.SPANISH);
+            System.out.println("Update completed, previous language: " + previousLanguage);
+        } catch (WorkflowUpdateException e) {
+            System.err.println("Update failed: " + e.getMessage());
+        }
+
+        // Or, start update and get handle to wait for acceptance
+        // WorkflowUpdateHandle<Language> handle =
+        //    WorkflowStub.fromTyped(workflow)
+        //        .startUpdate(
+        //            "setLanguage", WorkflowUpdateStage.ACCEPTED, Language.class, Language.FRENCH);
+        // System.out.println("Update " + handle.getId() + " accepted.");
+        // Language result = handle.getResultAsync().get(); // Wait for completion later
+    }
+}</code></pre>
+                </div>
+                <div class="tab-content" id="update-wf-dotnet">
+                    <h4>.NET</h4>
+                    <pre><code class="language-csharp">using Temporalio.Client;
+using System;
+using System.Threading.Tasks;
+using YourApplication.Workflows; // Assume YourWorkflow defines Task<Language> SetCurrentLanguageAsync(Language lang)
+
+public class WorkflowUpdater
+{
+    public static async Task UpdateWorkflowAsync()
+    {
+        var client = await TemporalClient.ConnectAsync(new("localhost:7233"));
+        var handle = client.GetWorkflowHandle<YourWorkflow>("workflow-id-123"); 
+
+        // Execute update and wait for completion
+        var previousLanguage = await handle.ExecuteUpdateAsync(
+            wf => wf.SetCurrentLanguageAsync(Language.Spanish));
+        Console.WriteLine($"Update completed, previous language: {previousLanguage}");
+
+        // Or, start update and get handle to wait for acceptance
+        // var updateHandle = await handle.StartUpdateAsync(
+        //    wf => wf.SetCurrentLanguageAsync(Language.French),
+        //    new(waitForStage: WorkflowUpdateStage.Accepted));
+        // Console.WriteLine($"Update {updateHandle.Id} accepted.");
+        // var result = await updateHandle.GetResultAsync(); // Wait for completion later
+    }
+}</code></pre>
+                </div>
+                <div class="tab-content" id="update-wf-php">
+                    <h4>PHP</h4>
+                    <pre><code class="language-php">&lt;?php declare(strict_types=1);
+namespace App\Client;
+
+use Temporal\Client\WorkflowClientInterface;
+use App\Workflow\YourWorkflowInterface; // Assume defines setLanguage(string $lang): string
+
+/** @var WorkflowClientInterface $workflowClient */
+$workflowStub = $workflowClient->newRunningWorkflowStub(YourWorkflowInterface::class, "workflow-id-123");
+
+// Execute update and wait for completion
+try {
+    $previousLanguage = $workflowStub->setLanguage('Spanish');
+    echo "Update completed, previous language: " . $previousLanguage . "\n";
+} catch (\Throwable $e) {
+    echo "Update failed: " . $e->getMessage() . "\n";
+}
+
+// Or, start update and get handle to wait for acceptance
+// use Temporal\Client\Update\LifecycleStage;
+// $handle = $workflowStub->startUpdate('setLanguage', 'French'); // Default stage is ACCEPTED
+// echo "Update " . $handle->getId() . " accepted.\n";
+// $result = $handle->getResult(); // Wait for completion later
+?&gt;</code></pre>
+                </div>
+            </div> <!-- End Update Tabs -->
+
+            <h4>Update-with-Start</h4>
+            <p>
+                Similar to Signal-with-Start, Update-with-Start allows a Client to send an Update to a Workflow, starting the Workflow Execution if it's not already running. 
+                If the Workflow exists, the Update is processed normally. If it doesn't exist, a new Workflow Execution is started with the given ID, 
+                and the Update is delivered and processed *before* the main Workflow logic begins execution.
+            </p>
+            <p><strong>Note:</strong> Update-with-Start is in Public Preview (as of Server v1.26+) and requires specific SDK Client methods.</p>
+
+            <!-- Tabs for Update-with-Start -->
+            <div class="tab-container">
+                 <div class="tab-buttons">
+                    <button class="tab-button" data-tab-target="uws-wf-ts">
+                        TypeScript
+                    </button>
+                    <button class="tab-button" data-tab-target="uws-wf-py">
+                        Python
+                    </button>
+                    <button class="tab-button" data-tab-target="uws-wf-go">
+                        Go
+                    </button>
+                    <button class="tab-button" data-tab-target="uws-wf-java">
+                        Java
+                    </button>
+                    <button class="tab-button" data-tab-target="uws-wf-dotnet">
+                        .NET
+                    </button>
+                    <button class="tab-button" data-tab-target="uws-wf-php">
+                        PHP
+                    </button>
+                </div>
+                <!-- Tab content divs inside tab-container -->
+               <div class="tab-content" id="uws-wf-ts">
+                    <h4>TypeScript</h4>
+                    <pre><code class="language-typescript">import { Client, WorkflowIdConflictPolicy } from '@temporalio/client';
+import { yourWorkflow, setLanguage } from './workflows'; // Assuming Update definition
+
+async function updateWithStartClient() {
+    const client = new Client();
+    const workflowId = 'uws-workflow-' + Date.now();
+
+    // Execute update-with-start and wait for completion
+    const handle = await client.workflow.executeUpdateWithStart(
+        yourWorkflow, // Workflow function
+        {
+            taskQueue: 'my-task-queue',
+            workflowId: workflowId,
+            workflowIdConflictPolicy: WorkflowIdConflictPolicy.USE_EXISTING,
+            args: [/* initial workflow args */],
+        },
+        setLanguage, // Update definition
+        [Language.ENGLISH] // Update args
+    );
+    console.log(`UpdateWithStart completed for ${handle.workflowId}, result: ${await handle.result()}`);
+
+    // Or, start update-with-start and get handle
+    // const updateHandle = await client.workflow.startUpdateWithStart(
+    //     yourWorkflow, { /* options */ }, setLanguage, [Language.FRENCH]
+    // );
+    // const result = await updateHandle.result();
+}</code></pre>
+                </div>
+                 <div class="tab-content" id="uws-wf-py">
+                    <h4>Python</h4>
+                    <p>Python SDK does not currently have a dedicated Update-with-Start API. You would typically check if a Workflow exists using `get_workflow_handle` and then either start+update or just update.</p>
+                    <pre><code class="language-python"># Conceptual Example - Check existence first
+import asyncio
+from temporalio.client import Client
+from temporalio.errors import WorkflowNotFound
+
+async def update_or_start_workflow():
+    client = await Client.connect("localhost:7233")
+    workflow_id = "uws-workflow-py"
+    task_queue = "my-task-queue"
+    update_arg = "spanish"
+    start_arg = "initial_state"
+
+    try:
+        handle = client.get_workflow_handle(workflow_id)
+        print(f"Workflow {workflow_id} exists. Sending update.")
+        result = await handle.execute_update("set_language", update_arg)
+        print(f"Update result: {result}")
+    except WorkflowNotFound:
+        print(f"Workflow {workflow_id} not found. Starting and updating.")
+        # Note: This doesn't guarantee atomicity like true Update-with-Start
+        handle = await client.start_workflow(
+            "YourWorkflow",
+            start_arg,
+            id=workflow_id,
+            task_queue=task_queue,
+        )
+        # Allow time for workflow to potentially start and be ready for update
+        await asyncio.sleep(1) 
+        result = await handle.execute_update("set_language", update_arg)
+        print(f"Started workflow {handle.id}, update result: {result}")
+</code></pre>
+                </div>
+                <div class="tab-content" id="uws-wf-go">
+                    <h4>Go</h4>
+                    <pre><code class="language-go">package main
+
+import (
+"context"
+"log"
+"time"
+"go.temporal.io/sdk/client"
+"go.temporal.io/api/enums/v1"
+"your_module/app" // Assume app defines SetLanguageUpdate & MyWorkflow
+)
+
+func main() {
+    c, _ := client.Dial(client.Options{})
+    defer c.Close()
+
+    workflowID := "uws-workflow-go"
+    taskQueue := "my-task-queue"
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    startOpts := client.StartWorkflowOptions{
+        ID:                       workflowID,
+        TaskQueue:                taskQueue,
+        WorkflowIDConflictPolicy: enumsv1.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING,
+    }
+    updateOpts := client.UpdateWorkflowOptions{
+        UpdateName:   app.SetLanguageUpdate,
+        WaitForStage: client.WorkflowUpdateStageCompleted, // Wait for completion
+        Args:         []interface{}{"spanish"},
+    }
+    
+    startWorkflowOp := client.NewWithStartWorkflowOperation(startOpts, app.MyWorkflow /*, initial args... */)
+
+    updateHandle, err := c.UpdateWithStartWorkflow(ctx, startWorkflowOp, updateOpts)
+    if err != nil {
+        log.Fatalln("UpdateWithStartWorkflow failed:", err)
+    }
+
+    var previousLang string
+    err = updateHandle.Get(ctx, &previousLang) // Get result from handle
+    if err != nil {
+        log.Fatalln("Failed to get UpdateWithStart result:", err)
+    }
+    log.Println("UpdateWithStart completed, previous language:", previousLang)
+}</code></pre>
+                </div>
+                <div class="tab-content" id="uws-wf-java">
+                    <h4>Java</h4>
+                    <pre><code class="language-java">package your.application;
+
+import io.temporal.client.*;
+import io.temporal.serviceclient.WorkflowServiceStubs;
+import your.application.workflows.YourWorkflow;
+import your.application.workflows.Language;
+import io.temporal.api.enums.v1.WorkflowIdReusePolicy;
+import java.time.Duration;
+
+public class UpdateWithStarter {
+    public static void main(String[] args) {
+        WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
+        WorkflowClient client = WorkflowClient.newInstance(service);
+        String workflowId = "uws-workflow-java";
+        String taskQueue = "my-task-queue";
+
+        WorkflowOptions startOptions = WorkflowOptions.newBuilder()
+            .setTaskQueue(taskQueue)
+            .setWorkflowId(workflowId)
+             // Required: Specify how to handle ID conflicts
+            .setWorkflowIdReusePolicy(WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY) // Or other appropriate policy
+            .build();
+        
+        // Create a stub just for specifying the target workflow type and options
+        YourWorkflow workflowStub = client.newWorkflowStub(YourWorkflow.class, startOptions);
+
+        UpdateOptions<Language> updateOptions = UpdateOptions.<Language>newBuilder()
+            .setUpdateName("setLanguage")
+            .setResultClass(Language.class)
+            .setWaitForStage(WorkflowUpdateStage.COMPLETED) // Wait for completion
+            .setFirstExecutionRunId(null) // Cannot specify RunID for UWS
+            .build();
+            
+        // Define the start operation (workflow method and initial args)
+        WithStartWorkflowOperation<YourWorkflow> startOperation =
+             new WithStartWorkflowOperation<>(workflowStub::execute /*, initial args... */);
+
+        try {
+            // Execute Update-with-Start and wait for result
+            Language previousLanguage = client.executeUpdateWithStart(
+                workflowStub::setLanguage, // Update method reference
+                updateOptions, 
+                startOperation,
+                Language.SPANISH // Update arguments
+            );
+            System.out.println("UpdateWithStart completed, previous language: " + previousLanguage);
+
+            // Or use startUpdateWithStart to get a handle
+            // WorkflowUpdateHandle<Language> handle = client.startUpdateWithStart(
+            //     workflowStub::setLanguage, updateOptions, startOperation, Language.FRENCH
+            // );
+            // Language result = handle.getResultAsync().get();
+
+        } catch (Exception e) {
+             System.err.println("UpdateWithStart failed: " + e);
+        }
+    }
+}</code></pre>
+                </div>
+                <div class="tab-content" id="uws-wf-dotnet">
+                    <h4>.NET</h4>
+                    <pre><code class="language-csharp">using Temporalio.Client;
+using Temporalio.Enums;
+using System;
+using System.Threading.Tasks;
+using YourApplication.Workflows;
+
+public class UpdateWithStartClient
+{
+    public static async Task UpdateWithStartAsync()
+    {
+        var client = await TemporalClient.ConnectAsync(new("localhost:7233"));
+        string workflowId = "uws-workflow-dotnet";
+        string taskQueue = "my-task-queue";
+
+        var startArgs = new StartWorkflowArgs { /* initial workflow args */ };
+
+        // Define the start operation (workflow run method and args)
+        var startOperation = new WithStartWorkflowOperation<YourWorkflow, StartWorkflowArgs>(
+            wf => wf.RunAsync(startArgs) // Reference to the WorkflowRun method
+        );
+
+        // Execute update-with-start and wait for completion
+        var previousLanguage = await client.ExecuteUpdateWithStartAsync(
+            workflowId, 
+            taskQueue,
+            (YourWorkflow wf) => wf.SetCurrentLanguageAsync(Language.Spanish), // Update lambda
+            startOperation, // Contains workflow lambda and args
+            new() { 
+                WorkflowIdConflictPolicy = WorkflowIdConflictPolicy.UseExisting, 
+                // Update options can be added here inside new WorkflowUpdateOptions()
+            } 
+        );
+        Console.WriteLine($"UpdateWithStart completed, previous language: {previousLanguage}");
+
+        // Or, start update-with-start and get handle
+        // var updateHandle = await client.StartUpdateWithStartAsync(
+        //    workflowId, taskQueue,
+        //    (YourWorkflow wf) => wf.SetCurrentLanguageAsync(Language.French),
+        //    startOperation,
+        //    new() { WorkflowIdConflictPolicy = WorkflowIdConflictPolicy.UseExisting }
+        // );
+        // var result = await updateHandle.GetResultAsync();
+    }
+}
+public class StartWorkflowArgs { /* Define args if needed */ }</code></pre>
+                </div>
+                <div class="tab-content" id="uws-wf-php">
+                    <h4>PHP</h4>
+                     <p>PHP SDK does not currently have a dedicated Update-with-Start API. A similar pattern to the Python example (check existence first) would be needed.</p>
+                    <pre><code class="language-php">&lt;?php
+// Conceptual Example - Check existence first
+use Temporal\Client\WorkflowClientInterface;
+use Temporal\Client\WorkflowStubInterface;
+use Temporal\Exception\Client\WorkflowNotFoundException;
+
+/** @var WorkflowClientInterface $workflowClient */
+$workflowId = 'uws-workflow-php';
+$taskQueue = 'my-task-queue';
+$updateArg = 'Spanish';
+$startArgs = [/* initial args */];
+
+try {
+    // Try to get a stub for a running workflow
+    $workflowStub = $workflowClient->newRunningWorkflowStub(YourWorkflowInterface::class, $workflowId);
+    echo "Workflow {$workflowId} exists. Sending update.\n";
+    $result = $workflowStub->setLanguage($updateArg);
+    echo "Update result: {$result}\n";
+} catch (WorkflowNotFoundException $e) {
+    echo "Workflow {$workflowId} not found. Starting and updating.\n";
+    // Note: This doesn't guarantee atomicity like true Update-with-Start
+    $workflowStub = $workflowClient->newWorkflowStub(
+        YourWorkflowInterface::class,
+        WorkflowOptions::new()
+            ->withTaskQueue($taskQueue)
+            ->withWorkflowId($workflowId)
+            // Use appropriate ID reuse policy
+    );
+    $run = $workflowClient->start($workflowStub, ...$startArgs);
+    // Potentially wait briefly for workflow to initialize
+    sleep(1); 
+    $result = $workflowStub->setLanguage($updateArg);
+    echo "Started workflow " . $run->getExecution()->id . ", update result: {$result}\n";
+}
+?&gt;</code></pre>
+                </div>
+             </div> <!-- End Update-with-Start Tabs -->
+
         </article>
 
       </section>
