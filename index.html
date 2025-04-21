@@ -2560,38 +2560,62 @@ async function updateWithStartClient() {
                 </div>
                  <div class="tab-content" id="uws-wf-py">
                     <h4>Python</h4>
-                    <p>Python SDK does not currently have a dedicated Update-with-Start API. You would typically check if a Workflow exists using `get_workflow_handle` and then either start+update or just update.</p>
-                    <pre><code class="language-python"># Conceptual Example - Check existence first
-import asyncio
-from temporalio.client import Client
-from temporalio.errors import WorkflowNotFound
+                    <p>Use <code>execute_update_with_start_workflow</code> or <code>start_update_with_start_workflow</code> on the Client.</p>
+                    <pre><code class="language-python">import asyncio
+from temporalio.client import Client, WorkflowUpdateFailedError
+from temporalio.common import WorkflowIDConflictPolicy
+from temporalio.client import WithStartWorkflowOperation
+# Assuming YourWorkflow with run() method and update handler 'add_item'
+# from your_workflow import YourWorkflow, ShoppingCartItem
 
-async def update_or_start_workflow():
+async def update_with_start_workflow_py():
     client = await Client.connect("localhost:7233")
     workflow_id = "uws-workflow-py"
     task_queue = "my-task-queue"
-    update_arg = "spanish"
-    start_arg = "initial_state"
+    item_id = "product-123"
+    quantity = 1
+    
+    # Define the operation to start the workflow if it doesn't exist
+    start_op = WithStartWorkflowOperation(
+        "YourWorkflow.run", # Reference to the workflow run method (or string name)
+        # Initial args for the workflow if started
+        id=workflow_id,
+        task_queue=task_queue,
+        id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
+    )
 
     try:
-        handle = client.get_workflow_handle(workflow_id)
-        print(f"Workflow {workflow_id} exists. Sending update.")
-        result = await handle.execute_update("set_language", update_arg)
-        print(f"Update result: {result}")
-    except WorkflowNotFound:
-        print(f"Workflow {workflow_id} not found. Starting and updating.")
-        # Note: This doesn't guarantee atomicity like true Update-with-Start
-        handle = await client.start_workflow(
-            "YourWorkflow",
-            start_arg,
-            id=workflow_id,
-            task_queue=task_queue,
+        # Execute update-with-start and wait for completion
+        update_result = await client.execute_update_with_start_workflow(
+            "YourWorkflow.add_item", # Reference to update handler (or string name)
+            ShoppingCartItem(sku=item_id, quantity=quantity), # Update args
+            start_workflow_operation=start_op,
         )
-        # Allow time for workflow to potentially start and be ready for update
-        await asyncio.sleep(1) 
-        result = await handle.execute_update("set_language", update_arg)
-        print(f"Started workflow {handle.id}, update result: {result}")
-</code></pre>
+        print(f"UpdateWithStart completed, result: {update_result}")
+
+        # Or, start update-with-start and get handle
+        # update_handle = await client.start_update_with_start_workflow(
+        #     "YourWorkflow.add_item", 
+        #     ShoppingCartItem(sku=item_id, quantity=quantity), 
+        #     start_workflow_operation=start_op,
+        #     wait_for_stage=client.WorkflowUpdateStage.ACCEPTED
+        # )
+        # print(f"UpdateWithStart {update_handle.id} accepted.")
+        # final_result = await update_handle.result()
+
+    except WorkflowUpdateFailedError as e:
+        print(f"UpdateWithStart failed: {e}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+# Placeholder class definitions for the example
+class ShoppingCartItem:
+    def __init__(self, sku, quantity):
+        self.sku = sku
+        self.quantity = quantity
+
+# Example usage:
+# asyncio.run(update_with_start_workflow_py())</code></pre>
                 </div>
                 <div class="tab-content" id="uws-wf-go">
                     <h4>Go</h4>
