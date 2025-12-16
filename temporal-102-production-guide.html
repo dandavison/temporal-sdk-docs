@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temporal 102: Production Checklist</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #1a1a1a;
+            border-bottom: 3px solid #4a90e2;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            color: #2c3e50;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        h3 {
+            color: #34495e;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            background: #f8f9fa;
+            border: none;
+            border-bottom: 3px solid transparent;
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .tab.active {
+            background: white;
+            color: #4a90e2;
+            border-bottom-color: #4a90e2;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        pre {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 16px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        code {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .warning strong {
+            color: #856404;
+        }
+
+        .tip {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .tip strong {
+            color: #0c5460;
+        }
+
+        .error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .error strong {
+            color: #721c24;
+        }
+
+        ul, ol {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        .highlight {
+            background: #fffacd;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/go.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/csharp.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Temporal 102: Production Checklist</h1>
+        <p style="font-size: 18px; color: #666; margin-bottom: 30px;">
+            Essential techniques and rules for authoring production-ready Temporal workflows and activities.
+            This guide covers non-obvious patterns, common pitfalls, and best practices that engineers should know but might forget.
+        </p>
+
+        <!-- Section 1: Workflow Determinism -->
+        <div class="section">
+            <h2>1. Workflow Determinism: The Foundation</h2>
+            <p>Workflows must be deterministic—they must produce the same sequence of commands when replayed from history. Violations cause non-determinism errors and workflow failures.</p>
+
+            <h3>1.1 Never Use System Time or Random in Workflows</h3>
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab(event, 'time-go')">Go</button>
+                <button class="tab" onclick="switchTab(event, 'time-java')">Java</button>
+                <button class="tab" onclick="switchTab(event, 'time-python')">Python</button>
+                <button class="tab" onclick="switchTab(event, 'time-ts')">TypeScript</button>
+                <button class="tab" onclick="switchTab(event, 'time-dotnet')">.NET</button>
+            </div>
+
+            <div id="time-go" class="tab-content active">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Using system time or random directly
+                </div>
+                <pre><code class="language-go">func MyWorkflow(ctx workflow.Context) error {
+    // ❌ NEVER DO THIS
+    if time.Now().Hour() < 12 {
+        // ...
+    }
+    id := uuid.New() // ❌ Non-deterministic
+    return nil
+}</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Use workflow APIs
+                </div>
+                <pre><code class="language-go">func MyWorkflow(ctx workflow.Context) error {
+    // ✅ Use workflow.Now()
+    now := workflow.Now(ctx)
+    if now.Hour() < 12 {
+        // ...
+    }
+
+    // ✅ Use workflow.UUID()
+    id := workflow.UUID()
+
+    // ✅ Use workflow.Random() for random numbers
+    random := workflow.Random(ctx)
+    return nil
+}</code></pre>
+            </div>
+
+            <div id="time-java" class="tab-content">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Using system time or random directly
+                </div>
+                <pre><code class="language-java">public class MyWorkflow implements WorkflowInterface {
+    public void execute() {
+        // ❌ NEVER DO THIS
+        if (LocalDateTime.now().getHour() < 12) {
+            // ...
+        }
+        String id = UUID.randomUUID().toString(); // ❌ Non-deterministic
+    }
+}</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Use workflow APIs
+                </div>
+                <pre><code class="language-java">public class MyWorkflow implements WorkflowInterface {
+    public void execute() {
+        // ✅ Use Workflow.currentTimeMillis()
+        long now = Workflow.currentTimeMillis();
+        if (Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault())
+                .getHour() < 12) {
+            // ...
+        }
+
+        // ✅ Use Workflow.randomUUID()
+        String id = Workflow.randomUUID().toString();
+
+        // ✅ Use Workflow.newRandom() for random numbers
+        Random random = Workflow.newRandom();
+    }
+}</code></pre>
+            </div>
+
+            <div id="time-python" class="tab-content">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Using system time or random directly
+                </div>
+                <pre><code class="language-python">from datetime import datetime
+import uuid
+import random
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # ❌ NEVER DO THIS
+        if datetime.now().hour < 12:
+            pass
+        id = str(uuid.uuid4())  # ❌ Non-deterministic
+        num = random.randint(1, 100)  # ❌ Non-deterministic</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Use workflow APIs
+                </div>
+                <pre><code class="language-python">from temporalio import workflow
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # ✅ Use workflow.now()
+        now = workflow.now()
+        if now.hour < 12:
+            pass
+
+        # ✅ Use workflow.uuid4()
+        id = str(workflow.uuid4())
+
+        # ✅ Use workflow.random() for random numbers
+        num = workflow.random().randint(1, 100)</code></pre>
+            </div>
+
+            <div id="time-ts" class="tab-content">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Using system time or random directly
+                </div>
+                <pre><code class="language-typescript">export async function myWorkflow(): Promise<void> {
+    // ❌ NEVER DO THIS
+    if (new Date().getHours() < 12) {
+        // ...
+    }
+    const id = crypto.randomUUID(); // ❌ Non-deterministic
+    const num = Math.random(); // ❌ Non-deterministic
+}</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Use workflow APIs
+                </div>
+                <pre><code class="language-typescript">import * as wf from '@temporalio/workflow';
+
+export async function myWorkflow(): Promise<void> {
+    // ✅ Use wf.now()
+    const now = wf.now();
+    if (now.getHours() < 12) {
+        // ...
+    }
+
+    // ✅ Use wf.uuid4()
+    const id = wf.uuid4();
+
+    // ✅ Use wf.random() for random numbers
+    const num = wf.random().nextInt(1, 100);
+}</code></pre>
+            </div>
+
+            <div id="time-dotnet" class="tab-content">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Using system time or random directly
+                </div>
+                <pre><code class="language-csharp">public class MyWorkflow : WorkflowBase
+{
+    public override Task RunAsync()
+    {
+        // ❌ NEVER DO THIS
+        if (DateTime.Now.Hour < 12)
+        {
+            // ...
+        }
+        var id = Guid.NewGuid(); // ❌ Non-deterministic
+        var num = Random.Shared.Next(); // ❌ Non-deterministic
+        return Task.CompletedTask;
+    }
+}</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Use workflow APIs
+                </div>
+                <pre><code class="language-csharp">using Temporalio.Workflows;
+
+public class MyWorkflow : WorkflowBase
+{
+    public override Task RunAsync()
+    {
+        // ✅ Use Workflow.UtcNow
+        var now = Workflow.UtcNow;
+        if (now.Hour < 12)
+        {
+            // ...
+        }
+
+        // ✅ Use Workflow.NewGuid()
+        var id = Workflow.NewGuid();
+
+        // ✅ Use Workflow.Random for random numbers
+        var num = Workflow.Random.Next(1, 100);
+        return Task.CompletedTask;
+    }
+}</code></pre>
+            </div>
+
+            <h3>1.2 No I/O, Threading, or External State</h3>
+            <div class="warning">
+                <strong>Critical:</strong> Workflows cannot perform I/O operations, use threads, or access mutable external state. All such operations must be in Activities.
+            </div>
+
+            <ul>
+                <li><strong>No network calls:</strong> HTTP requests, database queries, gRPC calls</li>
+                <li><strong>No file I/O:</strong> Reading/writing files, reading environment variables</li>
+                <li><strong>No threading:</strong> Goroutines (Go), threads (Java/.NET), async without workflow context</li>
+                <li><strong>No external state:</strong> Global variables, shared memory, system properties</li>
+            </ul>
+
+            <h3>1.3 Dictionary/Map Iteration Order</h3>
+            <div class="warning">
+                <strong>Note:</strong> Iterating over maps/dictionaries may have non-deterministic order in some languages. Use sorted collections or convert to lists first.
+            </div>
+        </div>
+
+        <!-- Section 2: Activity Heartbeating -->
+        <div class="section">
+            <h2>2. Activity Heartbeating: Essential for Long-Running Activities</h2>
+            <p>Heartbeating is <strong>required</strong> for cancellation detection and <strong>strongly recommended</strong> for any activity longer than a few seconds.</p>
+
+            <h3>2.1 Heartbeat Regularly</h3>
+            <p>Activities must explicitly call heartbeat functions. The SDK does not automatically heartbeat.</p>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab(event, 'heartbeat-go')">Go</button>
+                <button class="tab" onclick="switchTab(event, 'heartbeat-java')">Java</button>
+                <button class="tab" onclick="switchTab(event, 'heartbeat-python')">Python</button>
+                <button class="tab" onclick="switchTab(event, 'heartbeat-ts')">TypeScript</button>
+                <button class="tab" onclick="switchTab(event, 'heartbeat-dotnet')">.NET</button>
+            </div>
+
+            <div id="heartbeat-go" class="tab-content active">
+                <pre><code class="language-go">import (
+    "context"
+    "time"
+    "go.temporal.io/sdk/activity"
+)
+
+func LongRunningActivity(ctx context.Context, input string) (string, error) {
+    for i := 0; i < 100; i++ {
+        // ✅ Heartbeat with progress details
+        activity.RecordHeartbeat(ctx, i, "processing item")
+
+        // Do work
+        time.Sleep(1 * time.Second)
+
+        // ✅ Check for cancellation
+        if ctx.Err() != nil {
+            return "", ctx.Err()
+        }
+    }
+    return "done", nil
+}</code></pre>
+            </div>
+
+            <div id="heartbeat-java" class="tab-content">
+                <pre><code class="language-java">import io.temporal.activity.Activity;
+import io.temporal.activity.ActivityExecutionContext;
+
+public class Activities {
+    public String longRunningActivity(String input) {
+        ActivityExecutionContext context = Activity.getExecutionContext();
+        for (int i = 0; i < 100; i++) {
+            try {
+                // ✅ Heartbeat with progress details
+                context.heartbeat(i, "processing item");
+
+                // Do work
+                Thread.sleep(1000);
+            } catch (ActivityCompletionException e) {
+                // ✅ Cancellation detected via heartbeat
+                throw e;
+            }
+        }
+        return "done";
+    }
+}</code></pre>
+            </div>
+
+            <div id="heartbeat-python" class="tab-content">
+                <pre><code class="language-python">from temporalio import activity
+import asyncio
+
+@activity.defn
+async def long_running_activity(input: str) -> str:
+    for i in range(100):
+        try:
+            # ✅ Heartbeat with progress details
+            activity.heartbeat(i, "processing item")
+
+            # Do work
+            await asyncio.sleep(1)
+        except CancelledError:
+            # ✅ Cancellation detected
+            raise
+    return "done"</code></pre>
+            </div>
+
+            <div id="heartbeat-ts" class="tab-content">
+                <pre><code class="language-typescript">import { Context, CancelledFailure } from '@temporalio/activity';
+
+export async function longRunningActivity(input: string): Promise<string> {
+    const ctx = Context.current();
+    for (let i = 0; i < 100; i++) {
+        // ✅ Heartbeat with progress details
+        ctx.heartbeat(i, 'processing item');
+
+        // ✅ Check for cancellation
+        if (ctx.cancellationSignal.aborted) {
+            throw new CancelledFailure('Activity cancelled');
+        }
+
+        // Do work
+        await sleep(1000);
+    }
+    return 'done';
+}</code></pre>
+            </div>
+
+            <div id="heartbeat-dotnet" class="tab-content">
+                <pre><code class="language-csharp">using Temporalio.Activities;
+
+public class Activities
+{
+    [Activity]
+    public async Task<string> LongRunningActivityAsync(string input)
+    {
+        var context = ActivityExecutionContext.Current;
+        for (int i = 0; i < 100; i++)
+        {
+            // ✅ Heartbeat with progress details
+            context.Heartbeat(i, "processing item");
+
+            // ✅ Check for cancellation
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            // Do work
+            await Task.Delay(1000, context.CancellationToken);
+        }
+        return "done";
+    }
+}</code></pre>
+            </div>
+
+            <h3>2.2 Resume from Heartbeat Details</h3>
+            <p>Use heartbeat details to checkpoint progress and resume on retry.</p>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab(event, 'resume-go')">Go</button>
+                <button class="tab" onclick="switchTab(event, 'resume-java')">Java</button>
+                <button class="tab" onclick="switchTab(event, 'resume-python')">Python</button>
+                <button class="tab" onclick="switchTab(event, 'resume-ts')">TypeScript</button>
+                <button class="tab" onclick="switchTab(event, 'resume-dotnet')">.NET</button>
+            </div>
+
+            <div id="resume-go" class="tab-content active">
+                <pre><code class="language-go">func ProcessItemsActivity(ctx context.Context, items []string) error {
+    var lastProcessed int
+
+    // ✅ Check for previous progress
+    if activity.HasHeartbeatDetails(ctx) {
+        if err := activity.GetHeartbeatDetails(ctx, &lastProcessed); err == nil {
+            // Resume from checkpoint
+            items = items[lastProcessed:]
+        }
+    }
+
+    for i, item := range items {
+        // Process item
+        processItem(item)
+
+        // ✅ Save progress
+        activity.RecordHeartbeat(ctx, lastProcessed+i+1)
+    }
+    return nil
+}</code></pre>
+            </div>
+
+            <div id="resume-java" class="tab-content">
+                <pre><code class="language-java">public void processItemsActivity(List<String> items) {
+    ActivityExecutionContext context = Activity.getExecutionContext();
+    int lastProcessed = 0;
+
+    // ✅ Check for previous progress
+    if (context.getHeartbeatDetails().isPresent()) {
+        lastProcessed = context.getHeartbeatDetails().get();
+        items = items.subList(lastProcessed, items.size());
+    }
+
+    for (int i = 0; i < items.size(); i++) {
+        // Process item
+        processItem(items.get(i));
+
+        // ✅ Save progress
+        context.heartbeat(lastProcessed + i + 1);
+    }
+}</code></pre>
+            </div>
+
+            <div id="resume-python" class="tab-content">
+                <pre><code class="language-python">@activity.defn
+async def process_items_activity(items: list[str]) -> None:
+    last_processed = 0
+
+    # ✅ Check for previous progress
+    heartbeat_details = activity.info().heartbeat_details
+    if heartbeat_details:
+        last_processed = heartbeat_details[0]
+        items = items[last_processed:]
+
+    for i, item in enumerate(items):
+        # Process item
+        process_item(item)
+
+        # ✅ Save progress
+        activity.heartbeat(last_processed + i + 1)</code></pre>
+            </div>
+
+            <div id="resume-ts" class="tab-content">
+                <pre><code class="language-typescript">export async function processItemsActivity(items: string[]): Promise<void> {
+    const ctx = Context.current();
+    let lastProcessed = 0;
+
+    // ✅ Check for previous progress
+    const heartbeatDetails = ctx.info.heartbeatDetails;
+    if (heartbeatDetails && heartbeatDetails.length > 0) {
+        lastProcessed = heartbeatDetails[0] as number;
+        items = items.slice(lastProcessed);
+    }
+
+    for (let i = 0; i < items.length; i++) {
+        // Process item
+        processItem(items[i]);
+
+        // ✅ Save progress
+        ctx.heartbeat(lastProcessed + i + 1);
+    }
+}</code></pre>
+            </div>
+
+            <div id="resume-dotnet" class="tab-content">
+                <pre><code class="language-csharp">[Activity]
+public async Task ProcessItemsActivityAsync(List<string> items)
+{
+    var context = ActivityExecutionContext.Current;
+    int lastProcessed = 0;
+
+    // ✅ Check for previous progress
+    if (context.HeartbeatDetails.HasValue)
+    {
+        lastProcessed = context.HeartbeatDetails.Value.GetValue<int>();
+        items = items.Skip(lastProcessed).ToList();
+    }
+
+    for (int i = 0; i < items.Count; i++)
+    {
+        // Process item
+        ProcessItem(items[i]);
+
+        // ✅ Save progress
+        context.Heartbeat(lastProcessed + i + 1);
+    }
+}</code></pre>
+            </div>
+
+            <h3>2.3 Proper Cancellation Handling</h3>
+            <div class="warning">
+                <strong>Critical:</strong> You must propagate the cancellation error for the activity to be recorded as <strong>cancelled</strong> (not failed). If you catch and swallow the cancellation, the activity will be marked as failed.
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab(event, 'cancel-go')">Go</button>
+                <button class="tab" onclick="switchTab(event, 'cancel-java')">Java</button>
+                <button class="tab" onclick="switchTab(event, 'cancel-python')">Python</button>
+                <button class="tab" onclick="switchTab(event, 'cancel-ts')">TypeScript</button>
+                <button class="tab" onclick="switchTab(event, 'cancel-dotnet')">.NET</button>
+            </div>
+
+            <div id="cancel-go" class="tab-content active">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Swallowing cancellation
+                </div>
+                <pre><code class="language-go">func MyActivity(ctx context.Context) error {
+    for {
+        select {
+        case <-time.After(1 * time.Second):
+            activity.RecordHeartbeat(ctx)
+        case <-ctx.Done():
+            // ❌ WRONG: Returning nil means "failed", not "cancelled"
+            return nil
+        }
+    }
+}</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Return the cancellation error
+                </div>
+                <pre><code class="language-go">import "go.temporal.io/sdk/temporal"
+
+func MyActivity(ctx context.Context) error {
+    for {
+        select {
+        case <-time.After(1 * time.Second):
+            activity.RecordHeartbeat(ctx)
+        case <-ctx.Done():
+            // ✅ CORRECT: Return the error to mark as cancelled
+            return temporal.NewCanceledError("activity cancelled")
+        }
+    }
+}</code></pre>
+            </div>
+
+            <div id="cancel-java" class="tab-content">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Catching and swallowing cancellation
+                </div>
+                <pre><code class="language-java">public String myActivity() {
+    ActivityExecutionContext context = Activity.getExecutionContext();
+    try {
+        for (int i = 0; i < 100; i++) {
+            context.heartbeat(i);
+            Thread.sleep(1000);
+        }
+    } catch (ActivityCompletionException e) {
+        // ❌ WRONG: Swallowing means "failed", not "cancelled"
+        return "done anyway";
+    }
+    return "done";
+}</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Re-throw the exception
+                </div>
+                <pre><code class="language-java">public String myActivity() {
+    ActivityExecutionContext context = Activity.getExecutionContext();
+    try {
+        for (int i = 0; i < 100; i++) {
+            context.heartbeat(i);
+            Thread.sleep(1000);
+        }
+    } catch (ActivityCompletionException e) {
+        // ✅ CORRECT: Re-throw to mark as cancelled
+        throw e;
+    }
+    return "done";
+}</code></pre>
+            </div>
+
+            <div id="cancel-python" class="tab-content">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Catching and swallowing cancellation
+                </div>
+                <pre><code class="language-python">@activity.defn
+async def my_activity() -> str:
+    try:
+        for i in range(100):
+            activity.heartbeat(i)
+            await asyncio.sleep(1)
+    except CancelledError:
+        # ❌ WRONG: Swallowing means "failed", not "cancelled"
+        return "done anyway"
+    return "done"</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Re-raise the exception
+                </div>
+                <pre><code class="language-python">from temporalio.exceptions import CancelledError
+
+@activity.defn
+async def my_activity() -> str:
+    try:
+        for i in range(100):
+            activity.heartbeat(i)
+            await asyncio.sleep(1)
+    except CancelledError:
+        # ✅ CORRECT: Re-raise to mark as cancelled
+        raise
+    return "done"</code></pre>
+            </div>
+
+            <div id="cancel-ts" class="tab-content">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Catching and swallowing cancellation
+                </div>
+                <pre><code class="language-typescript">export async function myActivity(): Promise<string> {
+    const ctx = Context.current();
+    try {
+        for (let i = 0; i < 100; i++) {
+            ctx.heartbeat(i);
+            await sleep(1000);
+        }
+    } catch (err) {
+        if (err instanceof CancelledFailure) {
+            // ❌ WRONG: Swallowing means "failed", not "cancelled"
+            return 'done anyway';
+        }
+        throw err;
+    }
+    return 'done';
+}</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Re-throw the error
+                </div>
+                <pre><code class="language-typescript">import { CancelledFailure } from '@temporalio/activity';
+
+export async function myActivity(): Promise<string> {
+    const ctx = Context.current();
+    try {
+        for (let i = 0; i < 100; i++) {
+            ctx.heartbeat(i);
+            await sleep(1000);
+        }
+    } catch (err) {
+        if (err instanceof CancelledFailure) {
+            // ✅ CORRECT: Re-throw to mark as cancelled
+            throw err;
+        }
+        throw err;
+    }
+    return 'done';
+}</code></pre>
+            </div>
+
+            <div id="cancel-dotnet" class="tab-content">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Catching and swallowing cancellation
+                </div>
+                <pre><code class="language-csharp">[Activity]
+public async Task<string> MyActivityAsync()
+{
+    var context = ActivityExecutionContext.Current;
+    try
+    {
+        for (int i = 0; i < 100; i++)
+        {
+            context.Heartbeat(i);
+            await Task.Delay(1000);
+        }
+    }
+    catch (OperationCanceledException)
+    {
+        // ❌ WRONG: Swallowing means "failed", not "cancelled"
+        return "done anyway";
+    }
+    return "done";
+}</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Re-throw the exception
+                </div>
+                <pre><code class="language-csharp">[Activity]
+public async Task<string> MyActivityAsync()
+{
+    var context = ActivityExecutionContext.Current;
+    try
+    {
+        for (int i = 0; i < 100; i++)
+        {
+            context.Heartbeat(i);
+            await Task.Delay(1000, context.CancellationToken);
+        }
+    }
+    catch (OperationCanceledException)
+    {
+        // ✅ CORRECT: Re-throw to mark as cancelled
+        throw;
+    }
+    return "done";
+}</code></pre>
+            </div>
+        </div>
+
+        <!-- Section 3: Timeout Configuration -->
+        <div class="section">
+            <h2>3. Timeout Configuration: Getting It Right</h2>
+            <p>Proper timeout configuration is critical for production reliability. Each timeout serves a different purpose.</p>
+
+            <table>
+                <tr>
+                    <th>Timeout Type</th>
+                    <th>Scope</th>
+                    <th>What It Controls</th>
+                </tr>
+                <tr>
+                    <td><strong>ScheduleToClose</strong></td>
+                    <td>Activity</td>
+                    <td>Total time from scheduling to completion (includes retries)</td>
+                </tr>
+                <tr>
+                    <td><strong>StartToClose</strong></td>
+                    <td>Activity</td>
+                    <td>Time for a single attempt execution</td>
+                </tr>
+                <tr>
+                    <td><strong>Heartbeat</strong></td>
+                    <td>Activity</td>
+                    <td>Maximum time between heartbeats before timeout</td>
+                </tr>
+                <tr>
+                    <td><strong>Execution</strong></td>
+                    <td>Workflow</td>
+                    <td>Total workflow execution time</td>
+                </tr>
+                <tr>
+                    <td><strong>Run</strong></td>
+                    <td>Workflow</td>
+                    <td>Time for a single workflow run (before ContinueAsNew)</td>
+                </tr>
+                <tr>
+                    <td><strong>Task</strong></td>
+                    <td>Workflow</td>
+                    <td>Time for worker to process a workflow task</td>
+                </tr>
+            </table>
+
+            <h3>3.1 Activity Timeout Best Practices</h3>
+            <div class="tip">
+                <strong>Rule of thumb:</strong> <code>HeartbeatTimeout &lt; StartToCloseTimeout &lt; ScheduleToCloseTimeout</code>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab(event, 'timeout-go')">Go</button>
+                <button class="tab" onclick="switchTab(event, 'timeout-java')">Java</button>
+                <button class="tab" onclick="switchTab(event, 'timeout-python')">Python</button>
+                <button class="tab" onclick="switchTab(event, 'timeout-ts')">TypeScript</button>
+                <button class="tab" onclick="switchTab(event, 'timeout-dotnet')">.NET</button>
+            </div>
+
+            <div id="timeout-go" class="tab-content active">
+                <pre><code class="language-go">ao := workflow.ActivityOptions{
+    // ✅ ScheduleToClose: Total time including retries
+    ScheduleToCloseTimeout: 10 * time.Minute,
+
+    // ✅ StartToClose: Time for single attempt
+    StartToCloseTimeout: 2 * time.Minute,
+
+    // ✅ Heartbeat: Max time between heartbeats
+    HeartbeatTimeout: 30 * time.Second,
+
+    RetryPolicy: &temporal.RetryPolicy{
+        InitialInterval:    time.Second,
+        BackoffCoefficient: 2.0,
+        MaximumInterval:    1 * time.Minute,
+        MaximumAttempts:    5,
+    },
+}
+ctx = workflow.WithActivityOptions(ctx, ao)</code></pre>
+            </div>
+
+            <div id="timeout-java" class="tab-content">
+                <pre><code class="language-java">ActivityOptions options = ActivityOptions.newBuilder()
+    // ✅ ScheduleToClose: Total time including retries
+    .setScheduleToCloseTimeout(Duration.ofMinutes(10))
+
+    // ✅ StartToClose: Time for single attempt
+    .setStartToCloseTimeout(Duration.ofMinutes(2))
+
+    // ✅ Heartbeat: Max time between heartbeats
+    .setHeartbeatTimeout(Duration.ofSeconds(30))
+
+    .setRetryOptions(RetryOptions.newBuilder()
+        .setInitialInterval(Duration.ofSeconds(1))
+        .setBackoffCoefficient(2.0)
+        .setMaximumInterval(Duration.ofMinutes(1))
+        .setMaximumAttempts(5)
+        .build())
+    .build();</code></pre>
+            </div>
+
+            <div id="timeout-python" class="tab-content">
+                <pre><code class="language-python">from temporalio import workflow
+from temporalio.common import RetryPolicy
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # ✅ Configure timeouts
+        await workflow.execute_activity(
+            my_activity,
+            arg="value",
+            start_to_close_timeout=timedelta(minutes=2),
+            schedule_to_close_timeout=timedelta(minutes=10),
+            heartbeat_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(
+                initial_interval=timedelta(seconds=1),
+                backoff_coefficient=2.0,
+                maximum_interval=timedelta(minutes=1),
+                maximum_attempts=5,
+            ),
+        )</code></pre>
+            </div>
+
+            <div id="timeout-ts" class="tab-content">
+                <pre><code class="language-typescript">import { proxyActivities, sleep } from '@temporalio/workflow';
+import type * as activities from './activities';
+
+const { myActivity } = proxyActivities<typeof activities>({
+    // ✅ ScheduleToClose: Total time including retries
+    scheduleToCloseTimeout: '10m',
+
+    // ✅ StartToClose: Time for single attempt
+    startToCloseTimeout: '2m',
+
+    // ✅ Heartbeat: Max time between heartbeats
+    heartbeatTimeout: '30s',
+
+    retry: {
+        initialInterval: '1s',
+        backoffCoefficient: 2,
+        maximumInterval: '1m',
+        maximumAttempts: 5,
+    },
+});</code></pre>
+            </div>
+
+            <div id="timeout-dotnet" class="tab-content">
+                <pre><code class="language-csharp">var options = new ActivityOptions
+{
+    // ✅ ScheduleToClose: Total time including retries
+    ScheduleToCloseTimeout = TimeSpan.FromMinutes(10),
+
+    // ✅ StartToClose: Time for single attempt
+    StartToCloseTimeout = TimeSpan.FromMinutes(2),
+
+    // ✅ Heartbeat: Max time between heartbeats
+    HeartbeatTimeout = TimeSpan.FromSeconds(30),
+
+    RetryPolicy = new RetryPolicy
+    {
+        InitialInterval = TimeSpan.FromSeconds(1),
+        BackoffCoefficient = 2.0,
+        MaximumInterval = TimeSpan.FromMinutes(1),
+        MaximumAttempts = 5,
+    },
+};</code></pre>
+            </div>
+        </div>
+
+        <!-- Section 4: Error Handling -->
+        <div class="section">
+            <h2>4. Error Handling: Workflows vs Activities</h2>
+            <p>Error handling differs significantly between workflows and activities. Understanding this is crucial.</p>
+
+            <h3>4.1 Activity Errors</h3>
+            <p>Activities can return any error. The workflow receives it and decides how to handle it.</p>
+
+            <h3>4.2 Workflow Errors</h3>
+            <div class="warning">
+                <strong>Critical:</strong> Only <span class="highlight">ApplicationError</span> (or equivalent) should be thrown from workflows to fail the workflow execution. Other exceptions cause workflow task failures and are retried.
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab(event, 'error-go')">Go</button>
+                <button class="tab" onclick="switchTab(event, 'error-java')">Java</button>
+                <button class="tab" onclick="switchTab(event, 'error-python')">Python</button>
+                <button class="tab" onclick="switchTab(event, 'error-ts')">TypeScript</button>
+                <button class="tab" onclick="switchTab(event, 'error-dotnet')">.NET</button>
+            </div>
+
+            <div id="error-go" class="tab-content active">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Regular errors fail the task, not the workflow
+                </div>
+                <pre><code class="language-go">func MyWorkflow(ctx workflow.Context) error {
+    err := workflow.ExecuteActivity(ctx, MyActivity).Get(ctx, nil)
+    if err != nil {
+        // ❌ WRONG: This fails the workflow task, not the workflow
+        return err
+    }
+    return nil
+}</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Use ApplicationError for workflow failures
+                </div>
+                <pre><code class="language-go">import "go.temporal.io/sdk/temporal"
+
+func MyWorkflow(ctx workflow.Context) error {
+    err := workflow.ExecuteActivity(ctx, MyActivity).Get(ctx, nil)
+    if err != nil {
+        // ✅ CORRECT: Fail the workflow execution
+        return temporal.NewApplicationError(
+            "activity failed",
+            "ActivityError",
+            err,
+        )
+    }
+    return nil
+}</code></pre>
+            </div>
+
+            <div id="error-java" class="tab-content">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Regular exceptions fail the task, not the workflow
+                </div>
+                <pre><code class="language-java">public class MyWorkflow implements WorkflowInterface {
+    public void execute() {
+        try {
+            String result = Workflow.executeActivity(
+                Activities::myActivity,
+                String.class
+            ).get();
+        } catch (Exception e) {
+            // ❌ WRONG: This fails the workflow task, not the workflow
+            throw new RuntimeException(e);
+        }
+    }
+}</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Use ApplicationFailure for workflow failures
+                </div>
+                <pre><code class="language-java">import io.temporal.failure.ApplicationFailure;
+
+public class MyWorkflow implements WorkflowInterface {
+    public void execute() {
+        try {
+            String result = Workflow.executeActivity(
+                Activities::myActivity,
+                String.class
+            ).get();
+        } catch (Exception e) {
+            // ✅ CORRECT: Fail the workflow execution
+            throw ApplicationFailure.newNonRetryableFailure(
+                "activity failed",
+                "ActivityError",
+                e
+            );
+        }
+    }
+}</code></pre>
+            </div>
+
+            <div id="error-python" class="tab-content">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Regular exceptions fail the task, not the workflow
+                </div>
+                <pre><code class="language-python">@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        try:
+            result = await workflow.execute_activity(my_activity)
+        except Exception as e:
+            # ❌ WRONG: This fails the workflow task, not the workflow
+            raise</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Use ApplicationError for workflow failures
+                </div>
+                <pre><code class="language-python">from temporalio.exceptions import ApplicationError
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        try:
+            result = await workflow.execute_activity(my_activity)
+        except Exception as e:
+            # ✅ CORRECT: Fail the workflow execution
+            raise ApplicationError(
+                "activity failed",
+                "ActivityError",
+                non_retryable=True
+            ) from e</code></pre>
+            </div>
+
+            <div id="error-ts" class="tab-content">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Regular errors fail the task, not the workflow
+                </div>
+                <pre><code class="language-typescript">export async function myWorkflow(): Promise<void> {
+    try {
+        const result = await myActivity();
+    } catch (err) {
+        // ❌ WRONG: This fails the workflow task, not the workflow
+        throw err;
+    }
+}</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Use ApplicationFailure for workflow failures
+                </div>
+                <pre><code class="language-typescript">import { ApplicationFailure } from '@temporalio/workflow';
+
+export async function myWorkflow(): Promise<void> {
+    try {
+        const result = await myActivity();
+    } catch (err) {
+        // ✅ CORRECT: Fail the workflow execution
+        throw ApplicationFailure.nonRetryable(
+            'activity failed',
+            'ActivityError',
+            err
+        );
+    }
+}</code></pre>
+            </div>
+
+            <div id="error-dotnet" class="tab-content">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Regular exceptions fail the task, not the workflow
+                </div>
+                <pre><code class="language-csharp">public class MyWorkflow : WorkflowBase
+{
+    public override async Task RunAsync()
+    {
+        try
+        {
+            var result = await Workflow.ExecuteActivityAsync(
+                (Activities a) => a.MyActivityAsync()
+            );
+        }
+        catch (Exception e)
+        {
+            // ❌ WRONG: This fails the workflow task, not the workflow
+            throw;
+        }
+    }
+}</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Use ApplicationFailureException for workflow failures
+                </div>
+                <pre><code class="language-csharp">using Temporalio.Exceptions;
+
+public class MyWorkflow : WorkflowBase
+{
+    public override async Task RunAsync()
+    {
+        try
+        {
+            var result = await Workflow.ExecuteActivityAsync(
+                (Activities a) => a.MyActivityAsync()
+            );
+        }
+        catch (Exception e)
+        {
+            // ✅ CORRECT: Fail the workflow execution
+            throw new ApplicationFailureException(
+                "activity failed",
+                "ActivityError",
+                e,
+                nonRetryable: true
+            );
+        }
+    }
+}</code></pre>
+            </div>
+        </div>
+
+        <!-- Section 5: Workflow Versioning -->
+        <div class="section">
+            <h2>5. Workflow Versioning: Safe Code Changes</h2>
+            <p>When deploying workflow code changes, use versioning to prevent non-determinism errors for running workflows.</p>
+
+            <h3>5.1 Use GetVersion for Breaking Changes</h3>
+            <div class="warning">
+                <strong>Rule:</strong> Use <code>GetVersion</code> (or equivalent) when making changes that affect the command sequence, such as adding/removing activities, changing activity order, or modifying workflow logic.
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab(event, 'version-go')">Go</button>
+                <button class="tab" onclick="switchTab(event, 'version-java')">Java</button>
+                <button class="tab" onclick="switchTab(event, 'version-python')">Python</button>
+                <button class="tab" onclick="switchTab(event, 'version-ts')">TypeScript</button>
+                <button class="tab" onclick="switchTab(event, 'version-dotnet')">.NET</button>
+            </div>
+
+            <div id="version-go" class="tab-content active">
+                <pre><code class="language-go">func MyWorkflow(ctx workflow.Context) error {
+    // ✅ Get version for code changes
+    version := workflow.GetVersion(ctx, "change-id", workflow.DefaultVersion, 2)
+
+    if version == workflow.DefaultVersion {
+        // Old code path
+        err := workflow.ExecuteActivity(ctx, OldActivity).Get(ctx, nil)
+        return err
+    } else {
+        // New code path
+        err := workflow.ExecuteActivity(ctx, NewActivity).Get(ctx, nil)
+        return err
+    }
+}</code></pre>
+            </div>
+
+            <div id="version-java" class="tab-content">
+                <pre><code class="language-java">public class MyWorkflow implements WorkflowInterface {
+    public void execute() {
+        // ✅ Get version for code changes
+        int version = Workflow.getVersion("change-id",
+            Workflow.DEFAULT_VERSION, 2);
+
+        if (version == Workflow.DEFAULT_VERSION) {
+            // Old code path
+            Workflow.executeActivity(Activities::oldActivity, String.class)
+                .get();
+        } else {
+            // New code path
+            Workflow.executeActivity(Activities::newActivity, String.class)
+                .get();
+        }
+    }
+}</code></pre>
+            </div>
+
+            <div id="version-python" class="tab-content">
+                <pre><code class="language-python">@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # ✅ Get version for code changes
+        version = workflow.get_version("change-id", 1, 2)
+
+        if version == 1:
+            # Old code path
+            await workflow.execute_activity(old_activity)
+        else:
+            # New code path
+            await workflow.execute_activity(new_activity)</code></pre>
+            </div>
+
+            <div id="version-ts" class="tab-content">
+                <pre><code class="language-typescript">import { patched } from '@temporalio/workflow';
+
+export async function myWorkflow(): Promise<void> {
+    // ✅ Use patched() for code changes
+    if (patched('change-id')) {
+        // New code path
+        await newActivity();
+    } else {
+        // Old code path
+        await oldActivity();
+    }
+}</code></pre>
+            </div>
+
+            <div id="version-dotnet" class="tab-content">
+                <pre><code class="language-csharp">public class MyWorkflow : WorkflowBase
+{
+    public override async Task RunAsync()
+    {
+        // ✅ Get version for code changes
+        var version = await Workflow.GetVersionAsync("change-id", 1, 2);
+
+        if (version == 1)
+        {
+            // Old code path
+            await Workflow.ExecuteActivityAsync(
+                (Activities a) => a.OldActivityAsync()
+            );
+        }
+        else
+        {
+            // New code path
+            await Workflow.ExecuteActivityAsync(
+                (Activities a) => a.NewActivityAsync()
+            );
+        }
+    }
+}</code></pre>
+            </div>
+
+            <h3>5.2 Safe Changes Without Versioning</h3>
+            <p>These changes are safe and don't require versioning:</p>
+            <ul>
+                <li>Changing timeout values (except 0/-1 in some SDKs)</li>
+                <li>Changing activity arguments/options</li>
+                <li>Adding signal handlers for signals not yet sent</li>
+                <li>Modifying activity implementation (not workflow code)</li>
+            </ul>
+        </div>
+
+        <!-- Section 6: ContinueAsNew -->
+        <div class="section">
+            <h2>6. ContinueAsNew: Preventing History Bloat</h2>
+            <p>Use ContinueAsNew for long-running or perpetual workflows to prevent history size limits and performance issues.</p>
+
+            <h3>6.1 When to Use ContinueAsNew</h3>
+            <ul>
+                <li>Workflows that run indefinitely (entity workflows)</li>
+                <li>Workflows approaching history size limits</li>
+                <li>Workflows that need to upgrade to new code versions</li>
+            </ul>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab(event, 'can-go')">Go</button>
+                <button class="tab" onclick="switchTab(event, 'can-java')">Java</button>
+                <button class="tab" onclick="switchTab(event, 'can-python')">Python</button>
+                <button class="tab" onclick="switchTab(event, 'can-ts')">TypeScript</button>
+                <button class="tab" onclick="switchTab(event, 'can-dotnet')">.NET</button>
+            </div>
+
+            <div id="can-go" class="tab-content active">
+                <pre><code class="language-go">func PerpetualWorkflow(ctx workflow.Context, state WorkflowState) error {
+    // Process some work
+    for i := 0; i < 1000; i++ {
+        err := workflow.ExecuteActivity(ctx, ProcessItem, i).Get(ctx, nil)
+        if err != nil {
+            return err
+        }
+    }
+
+    // ✅ Update state
+    state.ProcessedCount += 1000
+
+    // ✅ Continue as new with updated state
+    return workflow.NewContinueAsNewError(ctx, PerpetualWorkflow, state)
+}</code></pre>
+            </div>
+
+            <div id="can-java" class="tab-content">
+                <pre><code class="language-java">public class PerpetualWorkflow implements WorkflowInterface {
+    public void execute(WorkflowState state) {
+        // Process some work
+        for (int i = 0; i < 1000; i++) {
+            Workflow.executeActivity(
+                Activities::processItem,
+                i,
+                String.class
+            ).get();
+        }
+
+        // ✅ Update state
+        state.setProcessedCount(state.getProcessedCount() + 1000);
+
+        // ✅ Continue as new with updated state
+        Workflow.continueAsNew(state);
+    }
+}</code></pre>
+            </div>
+
+            <div id="can-python" class="tab-content">
+                <pre><code class="language-python">@workflow.defn
+class PerpetualWorkflow:
+    @workflow.run
+    async def run(self, state: WorkflowState) -> None:
+        # Process some work
+        for i in range(1000):
+            await workflow.execute_activity(process_item, i)
+
+        # ✅ Update state
+        state.processed_count += 1000
+
+        # ✅ Continue as new with updated state
+        workflow.continue_as_new(state)</code></pre>
+            </div>
+
+            <div id="can-ts" class="tab-content">
+                <pre><code class="language-typescript">export async function perpetualWorkflow(
+    state: WorkflowState
+): Promise<void> {
+    // Process some work
+    for (let i = 0; i < 1000; i++) {
+        await processItem(i);
+    }
+
+    // ✅ Update state
+    state.processedCount += 1000;
+
+    // ✅ Continue as new with updated state
+    await continueAsNew(state);
+}</code></pre>
+            </div>
+
+            <div id="can-dotnet" class="tab-content">
+                <pre><code class="language-csharp">public class PerpetualWorkflow : WorkflowBase
+{
+    public override async Task RunAsync(WorkflowState state)
+    {
+        // Process some work
+        for (int i = 0; i < 1000; i++)
+        {
+            await Workflow.ExecuteActivityAsync(
+                (Activities a) => a.ProcessItemAsync(i)
+            );
+        }
+
+        // ✅ Update state
+        state.ProcessedCount += 1000;
+
+        // ✅ Continue as new with updated state
+        Workflow.ContinueAsNew(state);
+    }
+}</code></pre>
+            </div>
+
+            <h3>6.2 ContinueAsNew Considerations</h3>
+            <div class="warning">
+                <strong>Important:</strong> ContinueAsNew cannot be called while there are pending signals or updates. Wait for all handlers to finish.
+            </div>
+        </div>
+
+        <!-- Section 7: Activity Idempotency -->
+        <div class="section">
+            <h2>7. Activity Idempotency: Critical for Retries</h2>
+            <p>Activities are retried on failure. They must be idempotent or use idempotency keys to prevent duplicate operations.</p>
+
+            <h3>7.1 Making Activities Idempotent</h3>
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab(event, 'idempotent-go')">Go</button>
+                <button class="tab" onclick="switchTab(event, 'idempotent-java')">Java</button>
+                <button class="tab" onclick="switchTab(event, 'idempotent-python')">Python</button>
+                <button class="tab" onclick="switchTab(event, 'idempotent-ts')">TypeScript</button>
+                <button class="tab" onclick="switchTab(event, 'idempotent-dotnet')">.NET</button>
+            </div>
+
+            <div id="idempotent-go" class="tab-content active">
+                <pre><code class="language-go">func ProcessPaymentActivity(ctx context.Context, payment Payment) error {
+    // ✅ Use idempotency key from activity info
+    activityInfo := activity.GetInfo(ctx)
+    idempotencyKey := activityInfo.ActivityID
+
+    // ✅ Check if already processed
+    if isPaymentProcessed(idempotencyKey) {
+        return nil // Already done
+    }
+
+    // Process payment
+    err := chargeCard(payment)
+    if err != nil {
+        return err
+    }
+
+    // ✅ Mark as processed
+    markPaymentProcessed(idempotencyKey)
+    return nil
+}</code></pre>
+            </div>
+
+            <div id="idempotent-java" class="tab-content">
+                <pre><code class="language-java">public void processPaymentActivity(Payment payment) {
+    // ✅ Use idempotency key from activity info
+    ActivityExecutionContext context = Activity.getExecutionContext();
+    String idempotencyKey = context.getInfo().getActivityId();
+
+    // ✅ Check if already processed
+    if (isPaymentProcessed(idempotencyKey)) {
+        return; // Already done
+    }
+
+    // Process payment
+    chargeCard(payment);
+
+    // ✅ Mark as processed
+    markPaymentProcessed(idempotencyKey);
+}</code></pre>
+            </div>
+
+            <div id="idempotent-python" class="tab-content">
+                <pre><code class="language-python">@activity.defn
+async def process_payment_activity(payment: Payment) -> None:
+    # ✅ Use idempotency key from activity info
+    activity_info = activity.info()
+    idempotency_key = activity_info.activity_id
+
+    # ✅ Check if already processed
+    if is_payment_processed(idempotency_key):
+        return  # Already done
+
+    # Process payment
+    charge_card(payment)
+
+    # ✅ Mark as processed
+    mark_payment_processed(idempotency_key)</code></pre>
+            </div>
+
+            <div id="idempotent-ts" class="tab-content">
+                <pre><code class="language-typescript">export async function processPaymentActivity(
+    payment: Payment
+): Promise<void> {
+    // ✅ Use idempotency key from activity info
+    const ctx = Context.current();
+    const idempotencyKey = ctx.info.activityId;
+
+    // ✅ Check if already processed
+    if (isPaymentProcessed(idempotencyKey)) {
+        return; // Already done
+    }
+
+    // Process payment
+    chargeCard(payment);
+
+    // ✅ Mark as processed
+    markPaymentProcessed(idempotencyKey);
+}</code></pre>
+            </div>
+
+            <div id="idempotent-dotnet" class="tab-content">
+                <pre><code class="language-csharp">[Activity]
+public async Task ProcessPaymentActivityAsync(Payment payment)
+{
+    // ✅ Use idempotency key from activity info
+    var context = ActivityExecutionContext.Current;
+    var idempotencyKey = context.Info.ActivityId;
+
+    // ✅ Check if already processed
+    if (IsPaymentProcessed(idempotencyKey))
+    {
+        return; // Already done
+    }
+
+    // Process payment
+    ChargeCard(payment);
+
+    // ✅ Mark as processed
+    MarkPaymentProcessed(idempotencyKey);
+}</code></pre>
+            </div>
+        </div>
+
+        <!-- Section 8: Common Pitfalls -->
+        <div class="section">
+            <h2>8. Common Pitfalls and Gotchas</h2>
+
+            <h3>8.1 .NET Task Scheduler Issues</h3>
+            <div class="error">
+                <strong>Critical for .NET:</strong> Many .NET async operations use the default task scheduler, which is non-deterministic. Always use workflow-aware APIs.
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab(event, 'pitfall-dotnet')">.NET</button>
+            </div>
+
+            <div id="pitfall-dotnet" class="tab-content active">
+                <div class="error">
+                    <strong>❌ WRONG:</strong> Using Task.Run or ConfigureAwait(false)
+                </div>
+                <pre><code class="language-csharp">public override async Task RunAsync()
+{
+    // ❌ NEVER DO THIS
+    await Task.Run(() => DoWork());
+
+    // ❌ NEVER DO THIS
+    await SomeAsyncMethod().ConfigureAwait(false);
+}</code></pre>
+
+                <div class="tip">
+                    <strong>✅ CORRECT:</strong> Use Workflow.RunTaskAsync or ConfigureAwait(true)
+                </div>
+                <pre><code class="language-csharp">public override async Task RunAsync()
+{
+    // ✅ Use Workflow.RunTaskAsync
+    await Workflow.RunTaskAsync(() => DoWork());
+
+    // ✅ Use ConfigureAwait(true) or omit it
+    await SomeAsyncMethod().ConfigureAwait(true);
+}</code></pre>
+            </div>
+
+            <h3>8.2 Timer Duration Changes</h3>
+            <div class="warning">
+                <strong>Note:</strong> Changing a timer duration from/to 0 (Go/Java/Python) or -1 (.NET) is non-deterministic. Avoid this pattern.
+            </div>
+
+            <h3>8.3 Activity Options Inheritance</h3>
+            <p>Activity options are inherited from the workflow context. Set them once at the workflow level or override per-activity.</p>
+
+            <h3>8.4 Workflow Task Timeout</h3>
+            <div class="tip">
+                <strong>Tip:</strong> If workflows are timing out on task processing, increase the workflow task timeout. Long-running workflow code (loops, many activities) may need more time.
+            </div>
+
+            <h3>8.5 Local Activities vs Regular Activities</h3>
+            <table>
+                <tr>
+                    <th>Feature</th>
+                    <th>Regular Activity</th>
+                    <th>Local Activity</th>
+                </tr>
+                <tr>
+                    <td>Execution</td>
+                    <td>Separate worker task</td>
+                    <td>Same workflow worker</td>
+                </tr>
+                <tr>
+                    <td>Latency</td>
+                    <td>Higher (task queue round-trip)</td>
+                    <td>Lower (in-process)</td>
+                </tr>
+                <tr>
+                    <td>Retries</td>
+                    <td>Server-managed</td>
+                    <td>Workflow-managed</td>
+                </tr>
+                <tr>
+                    <td>Use Case</td>
+                    <td>Long-running, external calls</td>
+                    <td>Short, fast operations</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Section 9: Testing -->
+        <div class="section">
+            <h2>9. Testing Best Practices</h2>
+
+            <h3>9.1 Test Determinism</h3>
+            <p>Always test workflow replay to catch non-determinism issues before production.</p>
+
+            <h3>9.2 Test Timeouts</h3>
+            <p>Use time-skipping test environments to test timeout scenarios without waiting.</p>
+
+            <h3>9.3 Test Cancellation</h3>
+            <p>Verify that activities properly handle cancellation and mark themselves as cancelled (not failed).</p>
+        </div>
+
+        <!-- Section 10: Summary Checklist -->
+        <div class="section">
+            <h2>10. Production Deployment Checklist</h2>
+
+            <h3>Before Deploying Workflows:</h3>
+            <ul>
+                <li>✅ No system time/random calls in workflow code</li>
+                <li>✅ No I/O operations in workflow code</li>
+                <li>✅ All time operations use workflow APIs</li>
+                <li>✅ Workflow versioning in place for code changes</li>
+                <li>✅ ContinueAsNew for long-running workflows</li>
+                <li>✅ Proper timeout configuration</li>
+                <li>✅ Error handling uses ApplicationError</li>
+            </ul>
+
+            <h3>Before Deploying Activities:</h3>
+            <ul>
+                <li>✅ Heartbeating implemented for long-running activities</li>
+                <li>✅ Cancellation properly propagated (not swallowed)</li>
+                <li>✅ Activities are idempotent or use idempotency keys</li>
+                <li>✅ Heartbeat details used for progress checkpointing</li>
+                <li>✅ Proper timeout values configured</li>
+                <li>✅ Retry policies configured appropriately</li>
+            </ul>
+
+            <h3>General:</h3>
+            <ul>
+                <li>✅ Workflow replay tests pass</li>
+                <li>✅ Timeout values are realistic for production</li>
+                <li>✅ Monitoring and alerting in place</li>
+                <li>✅ Worker versioning strategy defined</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(event, tabId) {
+            // Hide all tab contents
+            const contents = event.target.parentElement.parentElement.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.remove('active'));
+
+            // Remove active class from all tabs
+            const tabs = event.target.parentElement.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // Show selected tab content
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Initialize syntax highlighting
+        document.addEventListener('DOMContentLoaded', function() {
+            hljs.highlightAll();
+        });
+    </script>
+</body>
+</html>
